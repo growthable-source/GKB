@@ -51,29 +51,35 @@
 **Files:**
 - Create: `package.json`, `tsconfig.json`, `next.config.ts`, `postcss.config.mjs`, `app/layout.tsx`, `app/globals.css`, `vitest.config.ts`, `.env.local.example`, `.gitignore` (modify)
 
-- [ ] **Step 1: Create the Next.js app in the existing directory**
+- [x] **Step 1: Create the Next.js app in the existing directory**
 
-Run from the repo root:
+`--src-dir false` is not a valid create-next-app flag; use `--no-src-dir` instead. Also, create-next-app refuses to scaffold into a directory whose package name (derived from the directory name) contains capital letters — `GKB` triggers this. What actually worked: move `README.md` and `.gitignore` aside, scaffold into a scratch directory with a lowercase name, then `rsync` the generated files (excluding `node_modules` and `.git`) into the repo root, rename `"name"` back to `"gkb"` in `package.json`, and restore/merge our `README.md` and `.gitignore`:
 
 ```bash
-pnpm create next-app@latest . --ts --tailwind --app --eslint --src-dir false --import-alias "@/*" --use-pnpm --yes
+mkdir -p /tmp/scaffold-tmp
+cd /tmp/scaffold-tmp
+pnpm create next-app@latest gkb-app --ts --tailwind --app --eslint --no-src-dir --import-alias "@/*" --use-pnpm --yes --disable-git
+rsync -a --exclude 'node_modules' --exclude '.git' /tmp/scaffold-tmp/gkb-app/ /Users/ryan/GKB/
+# then: fix package.json "name" to "gkb", restore our README.md, merge .gitignore (dedup)
 ```
 
-If it refuses because the directory is not empty, answer yes to proceed; it preserves `README.md`, `docs/`, and `.git`.
+Additionally, `pnpm install` in this environment blocks on native postinstall scripts (`sharp`, `unrs-resolver`) unless approved/denied explicitly. Ran `pnpm approve-builds` and declined both (they're optional; not needed for this scaffold) — this also required regenerating `pnpm-lock.yaml`/`node_modules` inside the real repo directory via a plain `pnpm install` after the copy.
 
-- [ ] **Step 2: Install runtime dependencies**
+Also note: our `.gitignore`'s Next.js-generated `.env*` line ignores `.env.local.example` too. Added `!.env.local.example` at the end of the env-files block so the template stays trackable.
+
+- [x] **Step 2: Install runtime dependencies**
 
 ```bash
 pnpm add @supabase/supabase-js @supabase/ssr sanitize-html @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-link @tiptap/extension-image @tiptap/extension-placeholder lucide-react clsx tailwind-merge
 ```
 
-- [ ] **Step 3: Install dev dependencies**
+- [x] **Step 3: Install dev dependencies**
 
 ```bash
 pnpm add -D vitest @types/sanitize-html supabase
 ```
 
-- [ ] **Step 4: Create the Vitest config**
+- [x] **Step 4: Create the Vitest config**
 
 Create `vitest.config.ts`:
 
@@ -92,7 +98,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 5: Add scripts to `package.json`**
+- [x] **Step 5: Add scripts to `package.json`**
 
 Add these entries to the `scripts` object, keeping the existing `dev`, `build`, `start`, and `lint`:
 
@@ -106,7 +112,7 @@ Add these entries to the `scripts` object, keeping the existing `dev`, `build`, 
 }
 ```
 
-- [ ] **Step 6: Create the environment template**
+- [x] **Step 6: Create the environment template**
 
 Create `.env.local.example`:
 
@@ -116,7 +122,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-- [ ] **Step 7: Ignore local Supabase state**
+- [x] **Step 7: Ignore local Supabase state**
 
 Append to `.gitignore`:
 
@@ -126,12 +132,12 @@ supabase/.branches
 .env.local
 ```
 
-- [ ] **Step 8: Verify the app builds**
+- [x] **Step 8: Verify the app builds**
 
 Run: `pnpm build`
 Expected: build completes with no errors.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add -A
