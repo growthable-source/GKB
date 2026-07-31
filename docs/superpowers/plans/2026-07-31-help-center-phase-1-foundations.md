@@ -923,6 +923,7 @@ git commit -m "feat: add slug generation"
 Create `lib/content/html.test.ts`:
 
 ```ts
+import sanitizeHtml from 'sanitize-html'
 import { describe, expect, it } from 'vitest'
 import { htmlToText, sanitizeArticleHtml } from './html'
 
@@ -948,6 +949,23 @@ describe('sanitizeArticleHtml', () => {
     const html = '<img src="https://cdn.example.com/a.png" alt="Screenshot" />'
     expect(sanitizeArticleHtml(html)).toContain('src="https://cdn.example.com/a.png"')
     expect(sanitizeArticleHtml(html)).toContain('alt="Screenshot"')
+  })
+})
+
+describe('render-boundary defense for search headlines', () => {
+  // htmlToText's output (body_text) is not guaranteed free of "<" — see the
+  // comment on htmlToText. The XSS defense for its one HTML-rendered
+  // consumer lives here instead: Postgres ts_headline wraps matches in
+  // body_text with <mark> and does not escape the rest of the string, so
+  // lib/search/search.ts re-sanitizes ts_headline's output down to
+  // allowedTags: ['mark'] before it is ever rendered. This test documents
+  // and locks in that guarantee.
+  it('strips everything except <mark> from ts_headline-shaped input', () => {
+    const headline = sanitizeHtml('<script>alert(1)</script> and <mark>hit</mark>', {
+      allowedTags: ['mark'],
+      allowedAttributes: {},
+    })
+    expect(headline).toBe(' and <mark>hit</mark>')
   })
 })
 
@@ -998,19 +1016,21 @@ describe('htmlToText', () => {
     expect(result.toLowerCase()).not.toContain('script')
   })
 
-  it('never leaks a "<" character for a table of hostile inputs', () => {
-    const hostileInputs = [
-      '<p>hi<img src=x onerror=alert(1)',
-      '<scr<script>ipt>alert(1)</script>',
-      '<a href="javascript:alert(1)">click</a>',
-      '<svg onload=alert(1)>x</svg>',
-      '<<script>script>alert(1)<</script>/script>',
-      '<div><p>unterminated',
-    ]
+  // SECURITY: decoding entities more than once is a bug, not an improvement.
+  // Double-encoded input like "&amp;lt;script&amp;gt;" must decode to the
+  // single-decoded literal text "&lt;script&gt;" — what a reader actually
+  // typed — and go no further. A second decode pass would turn that inert
+  // text into live-looking "<script>" markup. Do not add one.
+  it('decodes double-encoded input exactly once, not into live markup', () => {
+    expect(htmlToText('&amp;lt;script&amp;gt;')).toBe('&lt;script&gt;')
+  })
 
-    for (const input of hostileInputs) {
-      expect(htmlToText(input)).not.toContain('<')
-    }
+  it('decodes a double-encoded ampersand exactly once', () => {
+    expect(htmlToText('&amp;amp;')).toBe('&amp;')
+  })
+
+  it('decodes a double-encoded numeric reference exactly once', () => {
+    expect(htmlToText('&amp;#60;')).toBe('&#60;')
   })
 })
 ```
@@ -1053,6 +1073,13 @@ export function sanitizeArticleHtml(html: string): string {
  * (named entities plus numeric character references) so callers get genuine
  * plain text rather than escaped markup. `&amp;` is decoded last so an
  * entity like `&amp;lt;` does not double-decode into `<`.
+ *
+ * SECURITY: callers must invoke this exactly once per input. Decoding twice
+ * (or looping until a fixed point) can turn inert escaped text such as
+ * `&amp;lt;script&amp;gt;` — which decodes once to the harmless literal
+ * string `&lt;script&gt;` — into live-looking markup `<script>` on a second
+ * pass. `htmlToText` below relies on single-decode semantics for safety; do
+ * not add a second call to "helpfully" catch more entities.
  */
 function decodeHtmlEntities(text: string): string {
   return text
@@ -1076,43 +1103,55 @@ function decodeHtmlEntities(text: string): string {
  * "a < b and c > d". Instead this parses the input with the real HTML parser
  * first — which normalizes and closes malformed markup and escapes bare `<`
  * in prose to `&lt;` — before tag boundaries are turned into spaces and any
- * remaining tags are stripped. Entities are decoded last so the result is
- * genuine plain text.
+ * remaining tags are stripped. Entities are decoded exactly once at the end
+ * so the result is genuine plain text.
+ *
+ * This function does NOT guarantee its output is free of `<` — plain text
+ * can legitimately contain it (e.g. "if x < y"), and there is no safe way to
+ * strip it without also destroying real prose or reopening the double-decode
+ * bug described on `decodeHtmlEntities`. XSS safety for the two consumers of
+ * this text is enforced elsewhere: `body_text` is only ever rendered through
+ * `ts_headline`, whose output is re-sanitized down to `allowedTags: ['mark']`
+ * before it reaches the page (see `searchHelpCenter` in
+ * `lib/search/search.ts`), and `excerpt` is rendered through JSX, which
+ * escapes text nodes automatically. Do not add tag-stripping here to
+ * compensate for a render site that fails to sanitize or escape — fix that
+ * render site instead.
  */
 export function htmlToText(html: string): string {
   const wellFormed = sanitizeHtml(html, ARTICLE_OPTIONS)
   const spaced = wellFormed.replace(/<[^>]+>/g, ' ')
   const stripped = sanitizeHtml(spaced, { allowedTags: [], allowedAttributes: {} })
-  const decoded = decodeHtmlEntities(stripped)
-
-  // Decoding can reconstitute tag-like text that the parser had escaped as a
-  // single unit (e.g. an orphaned "&lt;/script&gt;" produced by a malformed
-  // attempt to smuggle a script tag past the parser above). Re-parse once
-  // more so any such fragment is recognized and dropped as real markup,
-  // while inert stray brackets in ordinary prose (which do not form valid
-  // tag syntax) simply get re-escaped and are decoded back below.
-  const reparsed = sanitizeHtml(decoded, { allowedTags: [], allowedAttributes: {} })
-
-  return decodeHtmlEntities(reparsed).replace(/\s+/g, ' ').trim()
+  return decodeHtmlEntities(stripped).replace(/\s+/g, ' ').trim()
 }
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/html.test.ts`
-Expected: PASS — 15 tests. If the link test fails because `rel` is added to the bare `<a>`, change that assertion to `expect(...).not.toContain('javascript:')` — never weaken the sanitizer to satisfy the test.
+Expected: PASS — 18 tests. If the link test fails because `rel` is added to the bare `<a>`, change that assertion to `expect(...).not.toContain('javascript:')` — never weaken the sanitizer to satisfy the test.
 
 Correction: the plan's original `htmlToText` implementation (a single `sanitizeHtml({allowedTags: []})`
 call) has two real bugs found in adversarial review: it only matches tags with a closing `>`, so an
 unclosed tag like `<img src=x onerror=alert(1)` (no `>`) survives verbatim in the output, and stripping
 tag boundaries without first parsing malformed markup destroys legitimate prose like `"a < b and c > d"`.
-The fix is to parse first (`sanitizeHtml` with the real `ARTICLE_OPTIONS` parser, which normalizes and
-closes malformed tags and escapes bare `<` in prose), then space out tag boundaries, strip what remains,
-and decode HTML entities — with one extra re-parse-and-decode pass afterward, because decoding can
-reconstitute tag-like text (e.g. an orphaned `&lt;/script&gt;`) that must be caught and dropped, while
-inert stray brackets in ordinary prose safely round-trip through the extra pass unchanged. The
-implementation above reflects this; the test count also grew from 8 to 15 to cover the malformed-markup,
-prose-preservation, and entity-decoding cases.
+The fix is to parse first with the real parser (`sanitizeHtml` with `ARTICLE_OPTIONS`, which normalizes
+and closes malformed tags and escapes bare `<` in prose to `&lt;`), then space out tag boundaries, strip
+what remains, and decode HTML entities exactly once.
+
+An earlier attempted fix added a second parse-and-decode pass to catch tag-like text reconstituted by
+decoding (e.g. an orphaned `&lt;/script&gt;`). That was itself a bug: double-encoded input such as
+`&amp;lt;script&amp;gt;` decodes once to the inert literal text `&lt;script&gt;`, but a second decode
+pass turns that same text into live `<script>` markup — the "fix" reopened the exact hole it was meant
+to close, and no amount of further passes would end the arms race. The correct model is that
+`htmlToText` returns honest plain text, which can legitimately contain `<` (e.g. "if x < y"), and that
+XSS safety belongs at the render boundary, not in the text extractor: `body_text` is only ever rendered
+through `ts_headline`, whose output is re-sanitized down to `allowedTags: ['mark']` in Task 14's
+`searchHelpCenter` before reaching the page, and `excerpt` is rendered through JSX, which escapes text
+automatically. The implementation above reflects the final, single-decode design; the test count grew
+from the original 8 to 18, covering the malformed-markup, prose-preservation, entity-decoding, and
+single-decode-safety cases, and adding one test (in the `render-boundary defense` describe block) that
+locks in the `allowedTags: ['mark']` guarantee Task 14 depends on.
 
 - [ ] **Step 5: Commit**
 

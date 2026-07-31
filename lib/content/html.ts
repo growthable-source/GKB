@@ -26,6 +26,13 @@ export function sanitizeArticleHtml(html: string): string {
  * (named entities plus numeric character references) so callers get genuine
  * plain text rather than escaped markup. `&amp;` is decoded last so an
  * entity like `&amp;lt;` does not double-decode into `<`.
+ *
+ * SECURITY: callers must invoke this exactly once per input. Decoding twice
+ * (or looping until a fixed point) can turn inert escaped text such as
+ * `&amp;lt;script&amp;gt;` — which decodes once to the harmless literal
+ * string `&lt;script&gt;` — into live-looking markup `<script>` on a second
+ * pass. `htmlToText` below relies on single-decode semantics for safety; do
+ * not add a second call to "helpfully" catch more entities.
  */
 function decodeHtmlEntities(text: string): string {
   return text
@@ -49,22 +56,24 @@ function decodeHtmlEntities(text: string): string {
  * "a < b and c > d". Instead this parses the input with the real HTML parser
  * first — which normalizes and closes malformed markup and escapes bare `<`
  * in prose to `&lt;` — before tag boundaries are turned into spaces and any
- * remaining tags are stripped. Entities are decoded last so the result is
- * genuine plain text.
+ * remaining tags are stripped. Entities are decoded exactly once at the end
+ * so the result is genuine plain text.
+ *
+ * This function does NOT guarantee its output is free of `<` — plain text
+ * can legitimately contain it (e.g. "if x < y"), and there is no safe way to
+ * strip it without also destroying real prose or reopening the double-decode
+ * bug described on `decodeHtmlEntities`. XSS safety for the two consumers of
+ * this text is enforced elsewhere: `body_text` is only ever rendered through
+ * `ts_headline`, whose output is re-sanitized down to `allowedTags: ['mark']`
+ * before it reaches the page (see `searchHelpCenter` in
+ * `lib/search/search.ts`), and `excerpt` is rendered through JSX, which
+ * escapes text nodes automatically. Do not add tag-stripping here to
+ * compensate for a render site that fails to sanitize or escape — fix that
+ * render site instead.
  */
 export function htmlToText(html: string): string {
   const wellFormed = sanitizeHtml(html, ARTICLE_OPTIONS)
   const spaced = wellFormed.replace(/<[^>]+>/g, ' ')
   const stripped = sanitizeHtml(spaced, { allowedTags: [], allowedAttributes: {} })
-  const decoded = decodeHtmlEntities(stripped)
-
-  // Decoding can reconstitute tag-like text that the parser had escaped as a
-  // single unit (e.g. an orphaned "&lt;/script&gt;" produced by a malformed
-  // attempt to smuggle a script tag past the parser above). Re-parse once
-  // more so any such fragment is recognized and dropped as real markup,
-  // while inert stray brackets in ordinary prose (which do not form valid
-  // tag syntax) simply get re-escaped and are decoded back below.
-  const reparsed = sanitizeHtml(decoded, { allowedTags: [], allowedAttributes: {} })
-
-  return decodeHtmlEntities(reparsed).replace(/\s+/g, ' ').trim()
+  return decodeHtmlEntities(stripped).replace(/\s+/g, ' ').trim()
 }

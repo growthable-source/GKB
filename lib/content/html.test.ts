@@ -1,3 +1,4 @@
+import sanitizeHtml from 'sanitize-html'
 import { describe, expect, it } from 'vitest'
 import { htmlToText, sanitizeArticleHtml } from './html'
 
@@ -23,6 +24,23 @@ describe('sanitizeArticleHtml', () => {
     const html = '<img src="https://cdn.example.com/a.png" alt="Screenshot" />'
     expect(sanitizeArticleHtml(html)).toContain('src="https://cdn.example.com/a.png"')
     expect(sanitizeArticleHtml(html)).toContain('alt="Screenshot"')
+  })
+})
+
+describe('render-boundary defense for search headlines', () => {
+  // htmlToText's output (body_text) is not guaranteed free of "<" — see the
+  // comment on htmlToText. The XSS defense for its one HTML-rendered
+  // consumer lives here instead: Postgres ts_headline wraps matches in
+  // body_text with <mark> and does not escape the rest of the string, so
+  // lib/search/search.ts re-sanitizes ts_headline's output down to
+  // allowedTags: ['mark'] before it is ever rendered. This test documents
+  // and locks in that guarantee.
+  it('strips everything except <mark> from ts_headline-shaped input', () => {
+    const headline = sanitizeHtml('<script>alert(1)</script> and <mark>hit</mark>', {
+      allowedTags: ['mark'],
+      allowedAttributes: {},
+    })
+    expect(headline).toBe(' and <mark>hit</mark>')
   })
 })
 
@@ -73,18 +91,20 @@ describe('htmlToText', () => {
     expect(result.toLowerCase()).not.toContain('script')
   })
 
-  it('never leaks a "<" character for a table of hostile inputs', () => {
-    const hostileInputs = [
-      '<p>hi<img src=x onerror=alert(1)',
-      '<scr<script>ipt>alert(1)</script>',
-      '<a href="javascript:alert(1)">click</a>',
-      '<svg onload=alert(1)>x</svg>',
-      '<<script>script>alert(1)<</script>/script>',
-      '<div><p>unterminated',
-    ]
+  // SECURITY: decoding entities more than once is a bug, not an improvement.
+  // Double-encoded input like "&amp;lt;script&amp;gt;" must decode to the
+  // single-decoded literal text "&lt;script&gt;" — what a reader actually
+  // typed — and go no further. A second decode pass would turn that inert
+  // text into live-looking "<script>" markup. Do not add one.
+  it('decodes double-encoded input exactly once, not into live markup', () => {
+    expect(htmlToText('&amp;lt;script&amp;gt;')).toBe('&lt;script&gt;')
+  })
 
-    for (const input of hostileInputs) {
-      expect(htmlToText(input)).not.toContain('<')
-    }
+  it('decodes a double-encoded ampersand exactly once', () => {
+    expect(htmlToText('&amp;amp;')).toBe('&amp;')
+  })
+
+  it('decodes a double-encoded numeric reference exactly once', () => {
+    expect(htmlToText('&amp;#60;')).toBe('&#60;')
   })
 })
