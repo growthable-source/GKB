@@ -12,6 +12,20 @@ export type ActiveHelpCenter = {
   settings: { headline?: string; subtitle?: string }
 }
 
+const VALID_VISIBILITIES = ['public', 'authenticated'] as const
+
+/**
+ * Narrows the raw `visibility` column to the known union, throwing rather
+ * than letting an unexpected value silently flow into access-gating logic —
+ * this field decides whether the whole help center is publicly readable.
+ */
+function parseVisibility(value: string): ActiveHelpCenter['visibility'] {
+  if ((VALID_VISIBILITIES as readonly string[]).includes(value)) {
+    return value as ActiveHelpCenter['visibility']
+  }
+  throw new Error(`Unexpected help_centers.visibility value: ${value}`)
+}
+
 /**
  * The help center serving the current request. Phase 1 always returns the base
  * center; Phase 2 resolves it from the Host header.
@@ -34,7 +48,7 @@ export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => 
     primaryHex: data.primary_hex,
     secondaryHex: data.secondary_hex,
     logoUrl: data.logo_url,
-    visibility: data.visibility as ActiveHelpCenter['visibility'],
+    visibility: parseVisibility(data.visibility),
     settings: (data.settings ?? {}) as ActiveHelpCenter['settings'],
   }
 })

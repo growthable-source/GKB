@@ -965,6 +965,53 @@ describe('htmlToText', () => {
   it('returns an empty string for empty input', () => {
     expect(htmlToText('')).toBe('')
   })
+
+  it('never lets an unclosed tag survive as markup', () => {
+    const result = htmlToText('<p>hi<img src=x onerror=alert(1)')
+    expect(result).not.toContain('<')
+    expect(result).not.toContain('onerror')
+  })
+
+  it('preserves prose that merely contains angle brackets', () => {
+    expect(htmlToText('a < b and c > d')).toBe('a < b and c > d')
+  })
+
+  it('decodes named entities', () => {
+    expect(htmlToText('<p>Tom &amp; Jerry said &quot;hi&quot;</p>')).toBe(
+      'Tom & Jerry said "hi"',
+    )
+  })
+
+  it('decodes an escaped angle bracket back to prose', () => {
+    expect(htmlToText('<p>5 &lt; 10</p>')).toBe('5 < 10')
+  })
+
+  it('decodes numeric entities into inert text, not markup', () => {
+    const result = htmlToText('&#106;avascript:alert(1)')
+    expect(result).toBe('javascript:alert(1)')
+    expect(result).not.toContain('<')
+  })
+
+  it('strips a nested/malformed script attempt entirely', () => {
+    const result = htmlToText('<scr<script>ipt>alert(1)</script>')
+    expect(result).not.toContain('<')
+    expect(result.toLowerCase()).not.toContain('script')
+  })
+
+  it('never leaks a "<" character for a table of hostile inputs', () => {
+    const hostileInputs = [
+      '<p>hi<img src=x onerror=alert(1)',
+      '<scr<script>ipt>alert(1)</script>',
+      '<a href="javascript:alert(1)">click</a>',
+      '<svg onload=alert(1)>x</svg>',
+      '<<script>script>alert(1)<</script>/script>',
+      '<div><p>unterminated',
+    ]
+
+    for (const input of hostileInputs) {
+      expect(htmlToText(input)).not.toContain('<')
+    }
+  })
 })
 ```
 
@@ -1001,18 +1048,71 @@ export function sanitizeArticleHtml(html: string): string {
   return sanitizeHtml(html, ARTICLE_OPTIONS)
 }
 
-/** Plain text for search indexing and excerpts. */
+/**
+ * Decodes the handful of HTML entities that can appear in sanitizer output
+ * (named entities plus numeric character references) so callers get genuine
+ * plain text rather than escaped markup. `&amp;` is decoded last so an
+ * entity like `&amp;lt;` does not double-decode into `<`.
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+}
+
+/**
+ * Plain text for search indexing and excerpts.
+ *
+ * Hand-rolled tag stripping (a regex like `/<[^>]+>/g`) is unsafe here: it
+ * cannot see across an unclosed tag, so a fragment like `<img src=x
+ * onerror=alert(1)` (no closing `>`) survives verbatim, and a naive "delete
+ * everything between < and >" approach also destroys legitimate prose like
+ * "a < b and c > d". Instead this parses the input with the real HTML parser
+ * first — which normalizes and closes malformed markup and escapes bare `<`
+ * in prose to `&lt;` — before tag boundaries are turned into spaces and any
+ * remaining tags are stripped. Entities are decoded last so the result is
+ * genuine plain text.
+ */
 export function htmlToText(html: string): string {
-  return sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} })
-    .replace(/\s+/g, ' ')
-    .trim()
+  const wellFormed = sanitizeHtml(html, ARTICLE_OPTIONS)
+  const spaced = wellFormed.replace(/<[^>]+>/g, ' ')
+  const stripped = sanitizeHtml(spaced, { allowedTags: [], allowedAttributes: {} })
+  const decoded = decodeHtmlEntities(stripped)
+
+  // Decoding can reconstitute tag-like text that the parser had escaped as a
+  // single unit (e.g. an orphaned "&lt;/script&gt;" produced by a malformed
+  // attempt to smuggle a script tag past the parser above). Re-parse once
+  // more so any such fragment is recognized and dropped as real markup,
+  // while inert stray brackets in ordinary prose (which do not form valid
+  // tag syntax) simply get re-escaped and are decoded back below.
+  const reparsed = sanitizeHtml(decoded, { allowedTags: [], allowedAttributes: {} })
+
+  return decodeHtmlEntities(reparsed).replace(/\s+/g, ' ').trim()
 }
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/html.test.ts`
-Expected: PASS — 8 tests. If the link test fails because `rel` is added to the bare `<a>`, change that assertion to `expect(...).not.toContain('javascript:')` — never weaken the sanitizer to satisfy the test.
+Expected: PASS — 15 tests. If the link test fails because `rel` is added to the bare `<a>`, change that assertion to `expect(...).not.toContain('javascript:')` — never weaken the sanitizer to satisfy the test.
+
+Correction: the plan's original `htmlToText` implementation (a single `sanitizeHtml({allowedTags: []})`
+call) has two real bugs found in adversarial review: it only matches tags with a closing `>`, so an
+unclosed tag like `<img src=x onerror=alert(1)` (no `>`) survives verbatim in the output, and stripping
+tag boundaries without first parsing malformed markup destroys legitimate prose like `"a < b and c > d"`.
+The fix is to parse first (`sanitizeHtml` with the real `ARTICLE_OPTIONS` parser, which normalizes and
+closes malformed tags and escapes bare `<` in prose), then space out tag boundaries, strip what remains,
+and decode HTML entities — with one extra re-parse-and-decode pass afterward, because decoding can
+reconstitute tag-like text (e.g. an orphaned `&lt;/script&gt;`) that must be caught and dropped, while
+inert stray brackets in ordinary prose safely round-trip through the extra pass unchanged. The
+implementation above reflects this; the test count also grew from 8 to 15 to cover the malformed-markup,
+prose-preservation, and entity-decoding cases.
 
 - [ ] **Step 5: Commit**
 
@@ -1049,6 +1149,20 @@ export type ActiveHelpCenter = {
   settings: { headline?: string; subtitle?: string }
 }
 
+const VALID_VISIBILITIES = ['public', 'authenticated'] as const
+
+/**
+ * Narrows the raw `visibility` column to the known union, throwing rather
+ * than letting an unexpected value silently flow into access-gating logic —
+ * this field decides whether the whole help center is publicly readable.
+ */
+function parseVisibility(value: string): ActiveHelpCenter['visibility'] {
+  if ((VALID_VISIBILITIES as readonly string[]).includes(value)) {
+    return value as ActiveHelpCenter['visibility']
+  }
+  throw new Error(`Unexpected help_centers.visibility value: ${value}`)
+}
+
 /**
  * The help center serving the current request. Phase 1 always returns the base
  * center; Phase 2 resolves it from the Host header.
@@ -1071,11 +1185,16 @@ export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => 
     primaryHex: data.primary_hex,
     secondaryHex: data.secondary_hex,
     logoUrl: data.logo_url,
-    visibility: data.visibility as ActiveHelpCenter['visibility'],
+    visibility: parseVisibility(data.visibility),
     settings: (data.settings ?? {}) as ActiveHelpCenter['settings'],
   }
 })
 ```
+
+Correction: `data.visibility as ActiveHelpCenter['visibility']` is an unchecked cast on a field that
+gates access to the whole help center. `parseVisibility` validates it at runtime against the known
+union and throws a clear error otherwise, rather than letting an unexpected column value flow into
+gating logic unchecked. The `settings` cast is left as-is.
 
 - [ ] **Step 2: Verify it type-checks**
 
@@ -1671,6 +1790,7 @@ Expected: `lib/db/types.ts` now includes `search_help_center` under `Functions`.
 Create `lib/search/search.ts`:
 
 ```ts
+import sanitizeHtml from 'sanitize-html'
 import { serviceClient } from '@/lib/db/client'
 
 export type SearchHit = {
@@ -1701,7 +1821,11 @@ export async function searchHelpCenter(
     articleId: row.article_id,
     slug: row.slug,
     title: row.title,
-    headline: row.headline ?? '',
+    // ts_headline does not escape its input, so body_text is re-parsed as HTML
+    // here and only the <mark> tags it introduced are allowed to survive —
+    // this is the last line of defense before the headline is ever rendered
+    // with dangerouslySetInnerHTML.
+    headline: sanitizeHtml(row.headline ?? '', { allowedTags: ['mark'], allowedAttributes: {} }),
   }))
 }
 ```
