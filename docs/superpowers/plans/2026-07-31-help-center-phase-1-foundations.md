@@ -1963,6 +1963,10 @@ export const config = {
 }
 ```
 
+Next 16 still runs `middleware.ts` and honours `export const config`, but prints
+"The \"middleware\" file convention is deprecated. Please use \"proxy\" instead."
+Renaming to `proxy.ts` is a separate, later change.
+
 - [ ] **Step 2: Write the login action**
 
 Create `app/login/actions.ts`:
@@ -2110,13 +2114,54 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 }
 ```
 
+- [ ] **Step 5b: Point the magic-link email at `/auth/confirm`**
+
+The route above verifies the OTP server-side from a `token_hash`. GoTrue's default
+`{{ .ConfirmationURL }}` instead sends the browser to its own `/verify` endpoint,
+which returns the session in a URL *fragment* the server can never read — the
+confirm route is never reached and no cookies are set. Override the template.
+
+Create `supabase/templates/magic_link.html`:
+
+```html
+<h2>Sign in to the help center</h2>
+<p>
+  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Sign in</a>
+</p>
+<p>If you did not request this link you can ignore this email.</p>
+```
+
+In `supabase/config.toml`, under `[auth]`, align the URLs with `NEXT_PUBLIC_SITE_URL`
+(GoTrue silently falls back to `site_url` when `redirect_to` is not allow-listed):
+
+```toml
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
+```
+
+and register the template:
+
+```toml
+[auth.email.template.magic_link]
+subject = "Sign in to the help center"
+content_path = "./supabase/templates/magic_link.html"
+```
+
+Restart for the config to take effect: `pnpm supabase stop && pnpm supabase start`.
+
 - [ ] **Step 6: Create an owner membership for yourself**
 
-Sign in once at `http://localhost:3000/login` (local Supabase captures mail at `http://127.0.0.1:54724`), then run:
+Sign in once at `http://localhost:3000/login` (local Supabase captures mail at
+`http://127.0.0.1:54724`, Mailpit), then run — the CLI has no `db query`
+subcommand, so go through the Postgres container directly:
 
 ```bash
-pnpm supabase db query "insert into memberships (user_id, help_center_id, role) select id, null, 'owner' from auth.users order by created_at limit 1 on conflict do nothing" --local
+docker exec supabase_db_GKB psql -U postgres -d postgres \
+  -c "insert into memberships (user_id, help_center_id, role) select id, null, 'owner' from auth.users where email='owner@example.com' on conflict do nothing"
 ```
+
+`memberships_scope_matches_role` only permits a NULL `help_center_id` for
+`owner` and `staff`.
 
 - [ ] **Step 7: Verify the gate works**
 
@@ -2126,7 +2171,8 @@ Expected: redirect to `/login`. After signing in, the admin shell renders.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add middleware.ts app/login app/auth app/admin/layout.tsx .env.local.example
+git add middleware.ts app/login app/auth app/admin/layout.tsx .env.local.example \
+  supabase/config.toml supabase/templates/magic_link.html
 git commit -m "feat: add magic-link auth and admin gate"
 ```
 
