@@ -1883,6 +1883,42 @@ git commit -m "feat: add keyword search within a help center"
 
 ---
 
+## Task 14b: Database grants (added during execution)
+
+**Files:**
+- Create: `supabase/migrations/0003_grants.sql`
+
+This task was not in the original plan. Review of Tasks 12-14 found that no Supabase API
+role had DML privileges on the tables created by migration 0001 — `service_role` held only
+`REFERENCES`, `TRIGGER`, and `TRUNCATE`, so every server-side query failed with
+`permission denied for table ...`. Nothing above Task 14 would have worked.
+
+- [ ] **Step 1: Grant privileges to the server role only**
+
+Create `supabase/migrations/0003_grants.sql` granting `usage` on schema `public` and all
+table, sequence, and function privileges to `service_role`, plus matching
+`alter default privileges` so future objects inherit them.
+
+Grant `anon` and `authenticated` NOTHING on public tables. RLS does not arrive until
+Phase 3, so any SELECT granted to those browser-reachable roles today would expose every
+draft and hidden article to anyone holding the public anon key. Grant them read access in
+the same change that enables RLS, never before.
+
+- [ ] **Step 2: Verify both halves of the posture**
+
+```bash
+pnpm db:reset
+```
+
+Then confirm with the real PostgREST path — not just `information_schema` — that
+`service_role` can select from a table and call `search_help_center`, and that `anon`
+receives `permission denied for table articles`. Both outcomes are required: the first
+proves the app works, the second proves nothing leaks.
+
+Because this migration takes the number `0003`, Task 18's storage migration is `0004`.
+
+---
+
 ## Task 15: Auth pages and admin gate
 
 **Files:**
@@ -2602,12 +2638,12 @@ git commit -m "feat: add article editor with publish"
 ## Task 18: Article image upload
 
 **Files:**
-- Create: `supabase/migrations/0003_storage_bucket.sql`, `app/api/uploads/route.ts`
+- Create: `supabase/migrations/0004_storage_bucket.sql`, `app/api/uploads/route.ts`
 - Modify: `components/editor/article-editor.tsx`
 
 - [ ] **Step 1: Create the storage bucket**
 
-Create `supabase/migrations/0003_storage_bucket.sql`:
+Create `supabase/migrations/0004_storage_bucket.sql`:
 
 ```sql
 insert into storage.buckets (id, name, public)
@@ -2722,7 +2758,7 @@ Expected: the image renders in the editor, and after Save and publish it renders
 - [ ] **Step 5: Commit**
 
 ```bash
-git add supabase/migrations/0003_storage_bucket.sql app/api/uploads components/editor
+git add supabase/migrations/0004_storage_bucket.sql app/api/uploads components/editor
 git commit -m "feat: upload article images to storage"
 ```
 
