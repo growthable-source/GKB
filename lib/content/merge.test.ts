@@ -58,6 +58,15 @@ describe('mergeArticle title', () => {
       false,
     )
   })
+
+  it('does not count a title override that matches the canonical value', () => {
+    const result = mergeArticle(canonical, {
+      ...placement,
+      titleOverride: 'Cancel your subscription',
+    })
+    expect(result.title).toBe('Cancel your subscription')
+    expect(result.isOverridden).toBe(false)
+  })
 })
 
 describe('mergeArticle body', () => {
@@ -107,6 +116,12 @@ describe('mergeArticle collection', () => {
     const result = mergeArticle(canonical, { ...placement, collectionOverrideId: 'c2' })
     expect(result.collectionId).toBe('c2')
     expect(result.isOverridden).toBe(true)
+  })
+
+  it('does not count a collection override that matches the canonical value', () => {
+    const result = mergeArticle(canonical, { ...placement, collectionOverrideId: 'c1' })
+    expect(result.collectionId).toBe('c1')
+    expect(result.isOverridden).toBe(false)
   })
 })
 
@@ -170,6 +185,11 @@ describe('mergeCollection', () => {
       audience: 'authenticated',
     })
     expect(result.isHidden).toBe(true)
+    expect(result.audience).toBe('authenticated')
+  })
+
+  it('defaults audience to authenticated to fail closed without a placement', () => {
+    const result = mergeCollection(canonicalCollection, null)
     expect(result.audience).toBe('authenticated')
   })
 })

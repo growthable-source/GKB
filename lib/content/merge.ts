@@ -25,6 +25,13 @@ export function mergeArticle(
   // counts when html is present; json follows it when supplied.
   const bodyJson = bodyHtml !== null ? (placement?.bodyJsonOverride ?? canonical.bodyJson) : canonical.bodyJson
 
+  // An override only counts toward isOverridden when it actually changes the
+  // effective value — a placement field equal to the canonical value is a
+  // no-op, not a local edit.
+  const titleChanged = title !== null && title !== canonical.title
+  const bodyChanged = bodyHtml !== null && bodyHtml !== canonical.bodyHtml
+  const collectionChanged = collectionId !== null && collectionId !== canonical.collectionId
+
   return {
     ...canonical,
     title: title ?? canonical.title,
@@ -33,7 +40,7 @@ export function mergeArticle(
     collectionId: collectionId ?? canonical.collectionId,
     position: placement?.position ?? 0,
     isHidden: placement?.isHidden ?? false,
-    isOverridden: title !== null || bodyHtml !== null || collectionId !== null,
+    isOverridden: titleChanged || bodyChanged || collectionChanged,
   }
 }
 
@@ -50,7 +57,11 @@ export function mergeCollection(
     description: description ?? canonical.description,
     position: placement?.position ?? 0,
     isHidden: placement?.isHidden ?? false,
-    audience: placement?.audience ?? 'public',
+    // Fail closed: without a placement row there is no record of who may see
+    // this collection, so treat it as gated rather than defaulting to public
+    // and risking a leak. Queries always join a real placement row; this
+    // default only guards the case where one is missing.
+    audience: placement?.audience ?? 'authenticated',
     isOverridden: title !== null || description !== null,
   }
 }

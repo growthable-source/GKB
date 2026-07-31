@@ -575,8 +575,29 @@ describe('mergeArticle collection', () => {
     expect(result.collectionId).toBe('c2')
     expect(result.isOverridden).toBe(true)
   })
-})
 
+  it('does not count a collection override that matches the canonical value', () => {
+    const result = mergeArticle(canonical, { ...placement, collectionOverrideId: 'c1' })
+    expect(result.collectionId).toBe('c1')
+    expect(result.isOverridden).toBe(false)
+  })
+})
+```
+
+This step also appends one more test to the `mergeArticle title` describe block from Task 5, closing the same gap for the title field:
+
+```ts
+  it('does not count a title override that matches the canonical value', () => {
+    const result = mergeArticle(canonical, {
+      ...placement,
+      titleOverride: 'Cancel your subscription',
+    })
+    expect(result.title).toBe('Cancel your subscription')
+    expect(result.isOverridden).toBe(false)
+  })
+```
+
+```ts
 describe('mergeArticle placement flags', () => {
   it('carries position and hidden through', () => {
     const result = mergeArticle(canonical, { ...placement, position: 7, isHidden: true })
@@ -595,7 +616,9 @@ describe('mergeArticle placement flags', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: FAIL — the body override tests fail because `mergeArticle` ignores body fields.
+Expected: FAIL — the body override tests fail because `mergeArticle` ignores body fields; the two
+"does not count a ... override that matches the canonical value" tests fail because `isOverridden`
+is set from mere presence of an override field rather than whether it changes the effective value.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -614,6 +637,13 @@ export function mergeArticle(
   // counts when html is present; json follows it when supplied.
   const bodyJson = bodyHtml !== null ? (placement?.bodyJsonOverride ?? canonical.bodyJson) : canonical.bodyJson
 
+  // An override only counts toward isOverridden when it actually changes the
+  // effective value — a placement field equal to the canonical value is a
+  // no-op, not a local edit.
+  const titleChanged = title !== null && title !== canonical.title
+  const bodyChanged = bodyHtml !== null && bodyHtml !== canonical.bodyHtml
+  const collectionChanged = collectionId !== null && collectionId !== canonical.collectionId
+
   return {
     ...canonical,
     title: title ?? canonical.title,
@@ -622,7 +652,7 @@ export function mergeArticle(
     collectionId: collectionId ?? canonical.collectionId,
     position: placement?.position ?? 0,
     isHidden: placement?.isHidden ?? false,
-    isOverridden: title !== null || bodyHtml !== null || collectionId !== null,
+    isOverridden: titleChanged || bodyChanged || collectionChanged,
   }
 }
 ```
@@ -630,7 +660,7 @@ export function mergeArticle(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: PASS — 12 tests.
+Expected: PASS — 14 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -702,13 +732,20 @@ describe('mergeCollection', () => {
     expect(result.isHidden).toBe(true)
     expect(result.audience).toBe('authenticated')
   })
+
+  it('defaults audience to authenticated to fail closed without a placement', () => {
+    const result = mergeCollection(canonicalCollection, null)
+    expect(result.audience).toBe('authenticated')
+  })
 })
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: FAIL — `mergeCollection is not a function`.
+Expected: FAIL — `mergeCollection is not a function`. Once `mergeCollection` exists, the
+"defaults audience to authenticated" test still fails until the default below is changed from
+`'public'` to `'authenticated'`, because audience must fail closed when there is no placement row.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -734,7 +771,11 @@ export function mergeCollection(
     description: description ?? canonical.description,
     position: placement?.position ?? 0,
     isHidden: placement?.isHidden ?? false,
-    audience: placement?.audience ?? 'public',
+    // Fail closed: without a placement row there is no record of who may see
+    // this collection, so treat it as gated rather than defaulting to public
+    // and risking a leak. Queries always join a real placement row; this
+    // default only guards the case where one is missing.
+    audience: placement?.audience ?? 'authenticated',
     isOverridden: title !== null || description !== null,
   }
 }
@@ -745,7 +786,7 @@ Move the `import type` line to join the existing type import at the top of the f
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: PASS — 15 tests.
+Expected: PASS — 18 tests.
 
 - [ ] **Step 5: Commit**
 
