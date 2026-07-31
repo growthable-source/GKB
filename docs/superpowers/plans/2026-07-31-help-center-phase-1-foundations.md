@@ -160,6 +160,12 @@ pnpm supabase start
 
 Expected: prints an API URL, anon key, and service role key. Copy them into `.env.local`.
 
+Correction: if this machine already has other local Supabase projects running (check with
+`docker ps --format '{{.Names}}\t{{.Ports}}'`), the default ports (54321-54329) will collide and
+`pnpm supabase start` will fail with `port is already allocated`. Fix by editing the port numbers in
+`supabase/config.toml` (`api.port`, `db.port`, `db.shadow_port`, `db.pooler.port`, `studio.port`,
+`local_smtp.port`, and the analytics port near the bottom) to an unused range, then retry.
+
 - [ ] **Step 2: Write the migration**
 
 Create `supabase/migrations/0001_initial_schema.sql` with the complete schema. Copy it verbatim from the "Schema" section of `docs/superpowers/specs/2026-07-31-help-center-platform-design.md`, with these two changes:
@@ -217,15 +223,23 @@ Expected: `Applying migration 0001_initial_schema.sql...` then `Seeding data sup
 - [ ] **Step 5: Verify the base help center exists**
 
 ```bash
-pnpm supabase db execute --local "select slug, is_base from help_centers"
+pnpm supabase db query "select slug, is_base from help_centers" --local
 ```
+
+Correction: the installed CLI (supabase 2.110.0) has no `db execute` subcommand; the working
+equivalent is `supabase db query <sql> --local`.
 
 Expected: one row, `base | t`.
 
 - [ ] **Step 6: Generate types**
 
-Run: `pnpm db:types`
+Run: `mkdir -p lib/db && pnpm db:types`
 Expected: `lib/db/types.ts` created containing `export type Database`.
+
+Correction: the `lib/db` directory does not exist yet on a fresh checkout (Task 1 does not create
+`lib/`), and shell output redirection (`> lib/db/types.ts`) does not create missing parent
+directories, so the bare `pnpm db:types` command fails with `No such file or directory` until the
+directory exists.
 
 - [ ] **Step 7: Commit**
 
