@@ -54,3 +54,67 @@ describe('mergeArticle title', () => {
     )
   })
 })
+
+describe('mergeArticle body', () => {
+  it('inherits the canonical body when no override is set', () => {
+    const result = mergeArticle(canonical, placement)
+    expect(result.bodyHtml).toBe('<p>Canonical body</p>')
+  })
+
+  it('replaces both body fields together when html is overridden', () => {
+    const overrideJson = { type: 'doc', content: [{ type: 'paragraph' }] }
+    const result = mergeArticle(canonical, {
+      ...placement,
+      bodyHtmlOverride: '<p>Local body</p>',
+      bodyJsonOverride: overrideJson,
+    })
+    expect(result.bodyHtml).toBe('<p>Local body</p>')
+    expect(result.bodyJson).toEqual(overrideJson)
+    expect(result.isOverridden).toBe(true)
+  })
+
+  it('keeps the canonical json when only html is overridden', () => {
+    const result = mergeArticle(canonical, {
+      ...placement,
+      bodyHtmlOverride: '<p>Local body</p>',
+    })
+    expect(result.bodyHtml).toBe('<p>Local body</p>')
+    expect(result.bodyJson).toEqual(canonical.bodyJson)
+  })
+
+  it('ignores a json override with no html override, because html is what renders', () => {
+    const result = mergeArticle(canonical, {
+      ...placement,
+      bodyJsonOverride: { type: 'doc', content: [{ type: 'paragraph' }] },
+    })
+    expect(result.bodyHtml).toBe('<p>Canonical body</p>')
+    expect(result.bodyJson).toEqual(canonical.bodyJson)
+    expect(result.isOverridden).toBe(false)
+  })
+})
+
+describe('mergeArticle collection', () => {
+  it('inherits the canonical collection', () => {
+    expect(mergeArticle(canonical, placement).collectionId).toBe('c1')
+  })
+
+  it('files the article under the override collection when set', () => {
+    const result = mergeArticle(canonical, { ...placement, collectionOverrideId: 'c2' })
+    expect(result.collectionId).toBe('c2')
+    expect(result.isOverridden).toBe(true)
+  })
+})
+
+describe('mergeArticle placement flags', () => {
+  it('carries position and hidden through', () => {
+    const result = mergeArticle(canonical, { ...placement, position: 7, isHidden: true })
+    expect(result.position).toBe(7)
+    expect(result.isHidden).toBe(true)
+  })
+
+  it('defaults position to 0 and hidden to false without a placement', () => {
+    const result = mergeArticle(canonical, null)
+    expect(result.position).toBe(0)
+    expect(result.isHidden).toBe(false)
+  })
+})
