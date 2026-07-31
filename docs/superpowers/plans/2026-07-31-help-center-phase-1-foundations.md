@@ -122,6 +122,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
+Correction (Task 2): this machine's `supabase/config.toml` was reassigned to non-default ports to avoid
+colliding with other local Supabase projects, so the actual `.env.local`/`.env.local.example` API URL
+is `http://127.0.0.1:54721`, not `54321`.
+
 - [x] **Step 7: Ignore local Supabase state**
 
 Append to `.gitignore`:
@@ -1852,10 +1856,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
 - [ ] **Step 6: Create an owner membership for yourself**
 
-Sign in once at `http://localhost:3000/login` (local Supabase captures mail at `http://127.0.0.1:54324`), then run:
+Sign in once at `http://localhost:3000/login` (local Supabase captures mail at `http://127.0.0.1:54724`), then run:
 
 ```bash
-pnpm supabase db execute --local "insert into memberships (user_id, help_center_id, role) select id, null, 'owner' from auth.users order by created_at limit 1 on conflict do nothing"
+pnpm supabase db query "insert into memberships (user_id, help_center_id, role) select id, null, 'owner' from auth.users order by created_at limit 1 on conflict do nothing" --local
 ```
 
 - [ ] **Step 7: Verify the gate works**
@@ -3202,14 +3206,31 @@ Append to `.gitignore`:
 
 - [ ] **Step 4: Write the test**
 
-This test signs in by requesting a magic link and reading it from the local Inbucket mail API that `supabase start` runs on port 54324.
+This test signs in by requesting a magic link and reading it from the local mail API that
+`supabase start` runs on port 54724.
+
+Correction (Task 2): CLI 2.110.0 ships **Mailpit**, not Inbucket, on this port (confirmed via
+`pnpm supabase status`, which reports `MAILPIT_URL`/`INBUCKET_URL` both pointing at
+`http://127.0.0.1:54724`, and empirically: `curl http://127.0.0.1:54724/api/v1/mailbox` returns
+`File not found`, while `curl http://127.0.0.1:54724/api/v1/messages` returns Mailpit's JSON list
+shape). Mailpit's API is list-then-fetch, not mailbox-by-address:
+
+- `GET /api/v1/messages` — lists all messages across all mailboxes (no per-recipient path segment).
+  Shape: `{"messages":[{"ID":"2turEJXP1fKpceKDxu32Jr","To":[{"Name":"","Address":"..."}],"Created":"2026-07-31T03:08:57.519Z", ...}], ...}`.
+  Filter client-side by `To[].Address` and take the most recent by `Created`.
+- `GET /api/v1/message/{ID}` — fetches one message by its `ID` (from the list above). The rendered
+  HTML body is in the `HTML` field (there is also a plaintext `Text` field), e.g.
+  `{"ID":"...","HTML":"<h2>Your sign-in link</h2>...<a href=\"http://127.0.0.1:54721/auth/v1/verify?token=...&amp;type=magiclink&amp;redirect_to=...\">Sign in</a>...","Text":"..."}`.
+
+Verified empirically by triggering a real OTP email via `POST /auth/v1/otp` against the local GoTrue
+instance and reading it back through both endpoints above.
 
 Create `e2e/publish-and-read.spec.ts`:
 
 ```ts
 import { expect, test } from '@playwright/test'
 
-const MAIL_API = 'http://127.0.0.1:54324/api/v1/mailbox'
+const MAIL_API = 'http://127.0.0.1:54724/api/v1'
 const EMAIL = 'owner@example.com'
 
 async function signIn(page: import('@playwright/test').Page) {
@@ -3218,11 +3239,14 @@ async function signIn(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /email me a link/i }).click()
   await expect(page.getByText(/check your email/i)).toBeVisible()
 
-  const messages = await (await fetch(`${MAIL_API}/${EMAIL}`)).json()
-  const latest = messages[messages.length - 1]
-  const message = await (await fetch(`${MAIL_API}/${EMAIL}/${latest.id}`)).json()
+  const { messages } = await (await fetch(`${MAIL_API}/messages`)).json()
+  const latest = messages
+    .filter((m: { To: { Address: string }[] }) => m.To.some((to) => to.Address === EMAIL))
+    .sort((a: { Created: string }, b: { Created: string }) => (a.Created < b.Created ? 1 : -1))[0]
+  expect(latest, 'magic link email received').toBeTruthy()
+  const message = await (await fetch(`${MAIL_API}/message/${latest.ID}`)).json()
 
-  const link = /href="([^"]*\/auth\/confirm[^"]*)"/.exec(message.body.html)?.[1]
+  const link = /href="([^"]*\/auth\/confirm[^"]*)"/.exec(message.HTML)?.[1]
   expect(link, 'magic link in email').toBeTruthy()
 
   await page.goto(link!.replace(/&amp;/g, '&'))
