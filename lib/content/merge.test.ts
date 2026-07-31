@@ -96,6 +96,15 @@ describe('mergeArticle body', () => {
     expect(result.bodyJson).toEqual(canonical.bodyJson)
   })
 
+  it('does not count a body override that matches the canonical value', () => {
+    const result = mergeArticle(canonical, {
+      ...placement,
+      bodyHtmlOverride: '<p>Canonical body</p>',
+    })
+    expect(result.bodyHtml).toBe('<p>Canonical body</p>')
+    expect(result.isOverridden).toBe(false)
+  })
+
   it('ignores a json override with no html override, because html is what renders', () => {
     const result = mergeArticle(canonical, {
       ...placement,

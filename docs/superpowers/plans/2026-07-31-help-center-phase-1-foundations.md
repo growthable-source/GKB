@@ -482,7 +482,7 @@ Create `lib/content/merge.ts`:
 import type { ArticlePlacement, CanonicalArticle, EffectiveArticle } from './types'
 
 /** Null, empty, and whitespace-only override values all mean "inherit". */
-function override(value: string | null | undefined): string | null {
+function normalizeOverride(value: string | null | undefined): string | null {
   if (value == null) return null
   return value.trim() === '' ? null : value
 }
@@ -491,7 +491,7 @@ export function mergeArticle(
   canonical: CanonicalArticle,
   placement: ArticlePlacement | null,
 ): EffectiveArticle {
-  const title = override(placement?.titleOverride)
+  const title = normalizeOverride(placement?.titleOverride)
 
   return {
     ...canonical,
@@ -629,8 +629,8 @@ export function mergeArticle(
   canonical: CanonicalArticle,
   placement: ArticlePlacement | null,
 ): EffectiveArticle {
-  const title = override(placement?.titleOverride)
-  const bodyHtml = override(placement?.bodyHtmlOverride)
+  const title = normalizeOverride(placement?.titleOverride)
+  const bodyHtml = normalizeOverride(placement?.bodyHtmlOverride)
   const collectionId = placement?.collectionOverrideId ?? null
 
   // Body json and html are a pair. Html is what renders, so an override only
@@ -660,7 +660,7 @@ export function mergeArticle(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: PASS — 14 tests.
+Expected: PASS — 15 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -773,8 +773,8 @@ export function mergeCollection(
   canonical: CanonicalCollection,
   placement: CollectionPlacement | null,
 ): EffectiveCollection {
-  const title = override(placement?.titleOverride)
-  const description = override(placement?.descriptionOverride)
+  const title = normalizeOverride(placement?.titleOverride)
+  const description = normalizeOverride(placement?.descriptionOverride)
 
   // Same rule as mergeArticle: a placement value equal to the canonical value
   // is a no-op, not a local edit.
@@ -802,7 +802,7 @@ Move the `import type` line to join the existing type import at the top of the f
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: PASS — 19 tests.
+Expected: PASS — 20 tests.
 
 - [ ] **Step 5: Commit**
 

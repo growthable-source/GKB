@@ -7,8 +7,11 @@ import type {
   EffectiveCollection,
 } from './types'
 
-/** Null, empty, and whitespace-only override values all mean "inherit". */
-function override(value: string | null | undefined): string | null {
+/**
+ * Normalizes a placement override value. Null, empty, and whitespace-only all
+ * mean "inherit", so a blank override never blanks out canonical content.
+ */
+function normalizeOverride(value: string | null | undefined): string | null {
   if (value == null) return null
   return value.trim() === '' ? null : value
 }
@@ -17,13 +20,14 @@ export function mergeArticle(
   canonical: CanonicalArticle,
   placement: ArticlePlacement | null,
 ): EffectiveArticle {
-  const title = override(placement?.titleOverride)
-  const bodyHtml = override(placement?.bodyHtmlOverride)
+  const title = normalizeOverride(placement?.titleOverride)
+  const bodyHtml = normalizeOverride(placement?.bodyHtmlOverride)
   const collectionId = placement?.collectionOverrideId ?? null
 
   // Body json and html are a pair. Html is what renders, so an override only
   // counts when html is present; json follows it when supplied.
-  const bodyJson = bodyHtml !== null ? (placement?.bodyJsonOverride ?? canonical.bodyJson) : canonical.bodyJson
+  const bodyJson =
+    bodyHtml === null ? canonical.bodyJson : (placement?.bodyJsonOverride ?? canonical.bodyJson)
 
   // An override only counts toward isOverridden when it actually changes the
   // effective value — a placement field equal to the canonical value is a
@@ -48,8 +52,8 @@ export function mergeCollection(
   canonical: CanonicalCollection,
   placement: CollectionPlacement | null,
 ): EffectiveCollection {
-  const title = override(placement?.titleOverride)
-  const description = override(placement?.descriptionOverride)
+  const title = normalizeOverride(placement?.titleOverride)
+  const description = normalizeOverride(placement?.descriptionOverride)
 
   // Same rule as mergeArticle: a placement value equal to the canonical value
   // is a no-op, not a local edit.
