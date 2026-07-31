@@ -737,6 +737,17 @@ describe('mergeCollection', () => {
     const result = mergeCollection(canonicalCollection, null)
     expect(result.audience).toBe('authenticated')
   })
+
+  it('does not count title or description overrides that match the canonical values', () => {
+    const result = mergeCollection(canonicalCollection, {
+      ...collectionPlacement,
+      titleOverride: 'Billing',
+      descriptionOverride: 'Invoices and payments.',
+    })
+    expect(result.title).toBe('Billing')
+    expect(result.description).toBe('Invoices and payments.')
+    expect(result.isOverridden).toBe(false)
+  })
 })
 ```
 
@@ -765,6 +776,11 @@ export function mergeCollection(
   const title = override(placement?.titleOverride)
   const description = override(placement?.descriptionOverride)
 
+  // Same rule as mergeArticle: a placement value equal to the canonical value
+  // is a no-op, not a local edit.
+  const titleChanged = title !== null && title !== canonical.title
+  const descriptionChanged = description !== null && description !== canonical.description
+
   return {
     ...canonical,
     title: title ?? canonical.title,
@@ -786,7 +802,7 @@ Move the `import type` line to join the existing type import at the top of the f
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: PASS — 18 tests.
+Expected: PASS — 19 tests.
 
 - [ ] **Step 5: Commit**
 

@@ -192,4 +192,15 @@ describe('mergeCollection', () => {
     const result = mergeCollection(canonicalCollection, null)
     expect(result.audience).toBe('authenticated')
   })
+
+  it('does not count title or description overrides that match the canonical values', () => {
+    const result = mergeCollection(canonicalCollection, {
+      ...collectionPlacement,
+      titleOverride: 'Billing',
+      descriptionOverride: 'Invoices and payments.',
+    })
+    expect(result.title).toBe('Billing')
+    expect(result.description).toBe('Invoices and payments.')
+    expect(result.isOverridden).toBe(false)
+  })
 })

@@ -51,6 +51,11 @@ export function mergeCollection(
   const title = override(placement?.titleOverride)
   const description = override(placement?.descriptionOverride)
 
+  // Same rule as mergeArticle: a placement value equal to the canonical value
+  // is a no-op, not a local edit.
+  const titleChanged = title !== null && title !== canonical.title
+  const descriptionChanged = description !== null && description !== canonical.description
+
   return {
     ...canonical,
     title: title ?? canonical.title,
@@ -62,6 +67,6 @@ export function mergeCollection(
     // and risking a leak. Queries always join a real placement row; this
     // default only guards the case where one is missing.
     audience: placement?.audience ?? 'authenticated',
-    isOverridden: title !== null || description !== null,
+    isOverridden: titleChanged || descriptionChanged,
   }
 }
