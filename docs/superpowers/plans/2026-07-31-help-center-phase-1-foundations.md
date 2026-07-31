@@ -2047,16 +2047,28 @@ export default function LoginPage() {
 
 Create `app/auth/confirm/route.ts`:
 
+First create `lib/auth/safe-next.ts` exporting `DEFAULT_NEXT = '/admin/articles'` and
+`safeNext(raw)`, which returns `DEFAULT_NEXT` unless `raw` is a same-origin relative path —
+rejecting absolute URLs, and rejecting `//` and `/\` prefixes because both are
+protocol-relative and resolve off-origin. Cover it in `lib/auth/safe-next.test.ts`.
+
+**This validation is required, not optional.** Passing the raw `next` parameter to
+`redirect()` is an open redirect: an attacker sends a link on our own domain that signs the
+victim in and then bounces them to an attacker-controlled page, borrowing the domain's
+trust. This was found and fixed during execution after being reproduced against a live
+session.
+
 ```ts
 import { type EmailOtpType } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { userClient } from '@/lib/db/client'
+import { safeNext } from '@/lib/auth/safe-next'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const token_hash = url.searchParams.get('token_hash')
   const type = url.searchParams.get('type') as EmailOtpType | null
-  const next = url.searchParams.get('next') ?? '/admin/articles'
+  const next = safeNext(url.searchParams.get('next'))
 
   if (!token_hash || !type) redirect('/login?error=invalid-link')
 

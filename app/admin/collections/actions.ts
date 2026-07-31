@@ -16,7 +16,13 @@ export async function createCollection(formData: FormData): Promise<void> {
   const description = String(formData.get('description') ?? '').trim() || null
   const db = serviceClient()
 
-  const { data: existing } = await db.from('collections').select('slug')
+  // Surface a read failure here rather than computing the slug against an empty
+  // list, which would collide with an existing slug and fail opaquely on insert.
+  const { data: existing, error: slugReadError } = await db.from('collections').select('slug')
+  if (slugReadError) {
+    throw new Error(`Could not read existing slugs: ${slugReadError.message}`)
+  }
+
   const slug = uniqueSlug(slugify(title), (existing ?? []).map((r) => r.slug))
 
   const { data: collection, error } = await db
