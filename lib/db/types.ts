@@ -603,7 +603,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      search_help_center: {
+        Args: { p_help_center_id: string; p_limit?: number; p_query: string }
+        Returns: {
+          article_id: string
+          headline: string
+          rank: number
+          slug: string
+          title: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
