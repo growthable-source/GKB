@@ -2479,6 +2479,7 @@ import { sanitizeArticleHtml, htmlToText } from '@/lib/content/html'
 import { slugify, uniqueSlug } from '@/lib/content/slug'
 import { getActiveHelpCenter } from '@/lib/tenancy/active'
 import { indexArticle } from '@/lib/search/index-article'
+import type { Json } from '@/lib/db/types'
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }
 
@@ -2528,7 +2529,9 @@ export async function saveArticle(input: {
     .update({
       title,
       collection_id: input.collectionId,
-      body_json: input.bodyJson,
+      // The editor's ProseMirror document is structurally JSON; TypeScript
+      // cannot see that through `Record<string, unknown>`.
+      body_json: input.bodyJson as Json,
       body_html: bodyHtml,
       excerpt,
     })

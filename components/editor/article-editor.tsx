@@ -72,6 +72,23 @@ export function ArticleEditor({
     })
   }
 
+  async function insertImage(file: File) {
+    setStatus('Uploading image…')
+    const body = new FormData()
+    body.append('file', file)
+
+    const response = await fetch('/api/uploads', { method: 'POST', body })
+    const result = (await response.json()) as { url?: string; error?: string }
+
+    if (!response.ok || !result.url) {
+      setStatus(result.error ?? 'Upload failed')
+      return
+    }
+
+    editor?.chain().focus().setImage({ src: result.url }).run()
+    setStatus(null)
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <input
@@ -93,6 +110,20 @@ export function ArticleEditor({
           </option>
         ))}
       </select>
+
+      <label className="w-fit cursor-pointer rounded-md border border-neutral-300 px-3 py-2 text-sm">
+        Insert image
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) void insertImage(file)
+            event.target.value = ''
+          }}
+        />
+      </label>
 
       <div className="rounded-lg border border-neutral-200 bg-white p-6">
         <EditorContent editor={editor} />
