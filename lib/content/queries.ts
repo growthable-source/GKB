@@ -166,16 +166,36 @@ export async function getEffectiveArticle(
   )
 }
 
-/** Article counts per collection, for the home page grid. */
+type ArticleCountRow = {
+  collection_override_id: string | null
+  articles: { collection_id: string | null } | { collection_id: string | null }[] | null
+}
+
+/**
+ * Article counts per collection, for the home page grid. Fetches only the id
+ * fields needed to determine each visible, published article's effective
+ * collection (see mergeArticle) and counts in JS, rather than fetching every
+ * article's full body once per collection.
+ */
 export async function countArticlesPerCollection(
   helpCenterId: string,
 ): Promise<Map<string, number>> {
-  const collections = await listEffectiveCollections(helpCenterId)
+  const { data, error } = await serviceClient()
+    .from('help_center_articles')
+    .select('collection_override_id, articles!inner (collection_id)')
+    .eq('help_center_id', helpCenterId)
+    .eq('is_hidden', false)
+    .eq('articles.status', 'published')
+
+  if (error) throw new Error(`countArticlesPerCollection failed: ${error.message}`)
+
   const counts = new Map<string, number>()
 
-  for (const collection of collections) {
-    const articles = await listEffectiveArticles(helpCenterId, collection.id)
-    counts.set(collection.id, articles.length)
+  for (const row of (data ?? []) as ArticleCountRow[]) {
+    const canonical = Array.isArray(row.articles) ? row.articles[0] : row.articles
+    const collectionId = row.collection_override_id ?? canonical?.collection_id ?? null
+    if (!collectionId) continue
+    counts.set(collectionId, (counts.get(collectionId) ?? 0) + 1)
   }
 
   return counts

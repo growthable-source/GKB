@@ -28,12 +28,20 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
         const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
           signal: controller.signal,
         })
+        if (!response.ok) throw new Error(`Search request failed: ${response.status}`)
         const data = (await response.json()) as { hits: Hit[] }
         setHits(data.hits)
         setActive(0)
         setOpen(true)
-      } catch {
-        // Aborted by the next keystroke; nothing to show.
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // Aborted by the next keystroke; nothing to show.
+          return
+        }
+        // A real failure (network error, non-OK response, bad JSON): don't leave
+        // stale hits on screen looking like they still match the current query.
+        setHits([])
+        setOpen(false)
       }
     }, 180)
 
@@ -77,13 +85,24 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
         onFocus={() => hits.length > 0 && setOpen(true)}
         placeholder="Search for answers…"
         aria-label="Search articles"
+        role="combobox"
+        aria-expanded={open && hits.length > 0}
+        aria-controls="search-box-listbox"
+        aria-autocomplete="list"
+        aria-activedescendant={
+          open && hits.length > 0 ? `search-box-option-${hits[active]?.articleId}` : undefined
+        }
         className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-base shadow-sm focus:border-neutral-900 focus:outline-none"
       />
 
       {open && hits.length > 0 && (
-        <ul className="absolute z-10 mt-2 w-full overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg">
+        <ul
+          id="search-box-listbox"
+          role="listbox"
+          className="absolute z-10 mt-2 w-full overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg"
+        >
           {hits.map((hit, index) => (
-            <li key={hit.articleId}>
+            <li key={hit.articleId} id={`search-box-option-${hit.articleId}`} role="option" aria-selected={index === active}>
               <a
                 href={`/a/${hit.slug}`}
                 className={`block px-4 py-3 ${index === active ? 'bg-neutral-100' : ''}`}
