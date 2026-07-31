@@ -2152,12 +2152,10 @@ Restart for the config to take effect: `pnpm supabase stop && pnpm supabase star
 - [ ] **Step 6: Create an owner membership for yourself**
 
 Sign in once at `http://localhost:3000/login` (local Supabase captures mail at
-`http://127.0.0.1:54724`, Mailpit), then run — the CLI has no `db query`
-subcommand, so go through the Postgres container directly:
+`http://127.0.0.1:54724`, Mailpit), then run:
 
 ```bash
-docker exec supabase_db_GKB psql -U postgres -d postgres \
-  -c "insert into memberships (user_id, help_center_id, role) select id, null, 'owner' from auth.users where email='owner@example.com' on conflict do nothing"
+pnpm supabase db query "insert into memberships (user_id, help_center_id, role) select id, null, 'owner' from auth.users where email='owner@example.com' on conflict do nothing" --local
 ```
 
 `memberships_scope_matches_role` only permits a NULL `help_center_id` for
