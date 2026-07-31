@@ -4,6 +4,12 @@
 # working directory name when running `supabase init`.
 project_id = "GKB"
 
+# NOTE: every port below is deliberately shifted from the Supabase defaults
+# (54321-54329) into the 547xx range, because the default range collided with
+# other local Supabase projects on the original developer's machine. The values
+# are intentional, not an accident — keep them in sync with .env.local.example
+# and with the mail port referenced by the Playwright e2e tests.
+
 [api]
 enabled = true
 # Port to use for the API URL.
