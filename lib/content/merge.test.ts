@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { mergeArticle } from './merge'
-import type { ArticlePlacement, CanonicalArticle } from './types'
+import { mergeArticle, mergeCollection } from './merge'
+import type {
+  ArticlePlacement,
+  CanonicalArticle,
+  CanonicalCollection,
+  CollectionPlacement,
+} from './types'
 
 const canonical: CanonicalArticle = {
   id: 'a1',
@@ -116,5 +121,55 @@ describe('mergeArticle placement flags', () => {
     const result = mergeArticle(canonical, null)
     expect(result.position).toBe(0)
     expect(result.isHidden).toBe(false)
+  })
+})
+
+const canonicalCollection: CanonicalCollection = {
+  id: 'c1',
+  slug: 'billing',
+  title: 'Billing',
+  description: 'Invoices and payments.',
+  icon: 'credit-card',
+}
+
+const collectionPlacement: CollectionPlacement = {
+  helpCenterId: 'h1',
+  collectionId: 'c1',
+  position: 2,
+  isHidden: false,
+  titleOverride: null,
+  descriptionOverride: null,
+  audience: 'public',
+}
+
+describe('mergeCollection', () => {
+  it('inherits canonical fields when nothing is overridden', () => {
+    const result = mergeCollection(canonicalCollection, collectionPlacement)
+    expect(result.title).toBe('Billing')
+    expect(result.description).toBe('Invoices and payments.')
+    expect(result.position).toBe(2)
+    expect(result.audience).toBe('public')
+    expect(result.isOverridden).toBe(false)
+  })
+
+  it('applies title and description overrides', () => {
+    const result = mergeCollection(canonicalCollection, {
+      ...collectionPlacement,
+      titleOverride: 'Payments',
+      descriptionOverride: 'Cards and receipts.',
+    })
+    expect(result.title).toBe('Payments')
+    expect(result.description).toBe('Cards and receipts.')
+    expect(result.isOverridden).toBe(true)
+  })
+
+  it('carries hidden and authenticated audience through', () => {
+    const result = mergeCollection(canonicalCollection, {
+      ...collectionPlacement,
+      isHidden: true,
+      audience: 'authenticated',
+    })
+    expect(result.isHidden).toBe(true)
+    expect(result.audience).toBe('authenticated')
   })
 })

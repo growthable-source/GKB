@@ -1,4 +1,11 @@
-import type { ArticlePlacement, CanonicalArticle, EffectiveArticle } from './types'
+import type {
+  ArticlePlacement,
+  CanonicalArticle,
+  CanonicalCollection,
+  CollectionPlacement,
+  EffectiveArticle,
+  EffectiveCollection,
+} from './types'
 
 /** Null, empty, and whitespace-only override values all mean "inherit". */
 function override(value: string | null | undefined): string | null {
@@ -27,5 +34,23 @@ export function mergeArticle(
     position: placement?.position ?? 0,
     isHidden: placement?.isHidden ?? false,
     isOverridden: title !== null || bodyHtml !== null || collectionId !== null,
+  }
+}
+
+export function mergeCollection(
+  canonical: CanonicalCollection,
+  placement: CollectionPlacement | null,
+): EffectiveCollection {
+  const title = override(placement?.titleOverride)
+  const description = override(placement?.descriptionOverride)
+
+  return {
+    ...canonical,
+    title: title ?? canonical.title,
+    description: description ?? canonical.description,
+    position: placement?.position ?? 0,
+    isHidden: placement?.isHidden ?? false,
+    audience: placement?.audience ?? 'public',
+    isOverridden: title !== null || description !== null,
   }
 }
