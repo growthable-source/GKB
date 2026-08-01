@@ -5,6 +5,7 @@ import { currentActor } from '@/lib/authz/authorize'
 const NAV = [
   { href: '/admin/articles', label: 'Articles' },
   { href: '/admin/collections', label: 'Collections' },
+  { href: '/admin/ops', label: 'Content Ops' },
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

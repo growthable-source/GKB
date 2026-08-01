@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { ROOT, chat, runPool, loadCheckpoint, saveCheckpoint } from './llm'
+import { pushSnapshot } from './snapshot'
 import type { AuditArticle, RewriteIndexEntry } from './types'
 
 const DRY = process.argv.includes('--dry-run')
@@ -184,6 +185,7 @@ async function main() {
     mkdirSync(path.dirname(appliedPath), { recursive: true })
     writeFileSync(appliedPath, JSON.stringify(applied, null, 1))
     console.log(`applied ${applyCount}, skipped ${skipCount} (already applied), failed ${failCount}`)
+    await pushSnapshot('rewrites', applied)
   } else {
     const rewritesDir = path.join(ROOT, 'import/ops/rewrites')
     mkdirSync(rewritesDir, { recursive: true })

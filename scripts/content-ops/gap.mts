@@ -22,6 +22,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { ROOT, chat, parseJsonLoose, runPool, loadCheckpoint, saveCheckpoint } from './llm'
+import { pushSnapshot } from './snapshot'
 import type { GapItem } from './types'
 
 const { serviceClient } = await import('../../lib/db/client')
@@ -210,6 +211,7 @@ async function main() {
   mkdirSync(outDir, { recursive: true })
   writeFileSync(path.join(outDir, 'gap.json'), JSON.stringify(deduped, null, 1))
   console.log(`wrote import/ops/gap.json (${deduped.length} gaps found)`)
+  await pushSnapshot('gaps', deduped)
   if (chunkErrors.length > 0) {
     console.log(`${chunkErrors.length} chunk(s) failed and were skipped:`)
     for (const e of chunkErrors) console.log(`  ${e}`)

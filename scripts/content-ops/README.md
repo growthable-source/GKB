@@ -19,6 +19,14 @@ stages, run in order:
 4. **`pnpm ops:report`** — renders `import/ops/REPORT.md` from the outputs
    above. No API calls.
 
+Each of `audit`, `gap`, and `rewrite --apply` also pushes its result to the
+`ops_snapshots` table (see `snapshot.ts`) as soon as it finishes, so the
+deployed app — which can't read these local JSON files — can render them at
+`/admin/ops`. **`pnpm ops:push`** reads the three JSON files already on disk
+and pushes all three snapshot kinds without recomputing or calling any API;
+use it to backfill the DB from results computed before this existed, or to
+seed a fresh environment.
+
 Every stage takes `--dry-run` (does everything except call the LLM API;
 `rewrite`/`report` also skip writing files that would depend on a call that
 didn't happen).

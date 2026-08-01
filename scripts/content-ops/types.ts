@@ -40,3 +40,10 @@ export type RewriteIndexEntry = {
   status: 'proposed' | 'failed'
   reason?: string
 }
+
+/** One entry in import/ops/rewrites/applied.json: either applied to the DB, or held back for manual review. */
+export type RewriteApplication =
+  | { slug: string; appliedAt: string }
+  | { slug: string; held: true; note: string }
+
+export type RewriteApplications = Record<string, RewriteApplication>

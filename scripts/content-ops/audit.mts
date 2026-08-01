@@ -18,6 +18,8 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { ROOT, chat, parseJsonLoose, runPool, loadCheckpoint, saveCheckpoint } from './llm'
+import { summarizeAudit } from './summarize'
+import { pushSnapshot } from './snapshot'
 import type { AuditArticle, BrandLeak, Classification } from './types'
 
 const { serviceClient } = await import('../../lib/db/client')
@@ -209,6 +211,9 @@ async function main() {
   mkdirSync(outDir, { recursive: true })
   writeFileSync(path.join(outDir, 'audit.json'), JSON.stringify(finalArticles, null, 1))
   console.log(`wrote import/ops/audit.json (${finalArticles.length} articles)`)
+
+  const summary = summarizeAudit(finalArticles)
+  await pushSnapshot('audit', { summary, articles: finalArticles })
 }
 
 await main()

@@ -7,6 +7,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { ROOT } from './llm'
+import { summarizeAudit } from './summarize'
 import type { AuditArticle, GapItem, GapStub, RewriteIndexEntry } from './types'
 
 const DRY = process.argv.includes('--dry-run')
@@ -37,37 +38,25 @@ function main() {
   lines.push('')
 
   // Summary
-  const shortCount = audit.filter((a) => a.shortArticle).length
+  const summary = summarizeAudit(audit)
   const leakArticles = audit.filter((a) => a.brandLeaks.length > 0)
-  const totalLeaks = audit.reduce((sum, a) => sum + a.brandLeaks.length, 0)
-  const externalImageArticles = audit.filter((a) => a.externalImageCount > 0)
-  const totalImages = audit.reduce((sum, a) => sum + a.imageCount, 0)
-  const totalExternalImages = audit.reduce((sum, a) => sum + a.externalImageCount, 0)
-  const avgWordCount = Math.round(audit.reduce((sum, a) => sum + a.wordCount, 0) / (audit.length || 1))
-  const classified = audit.filter((a) => a.quality !== null)
-  const avgQuality = classified.length
-    ? (classified.reduce((sum, a) => sum + (a.quality ?? 0), 0) / classified.length).toFixed(1)
-    : 'n/a'
-  const riskCounts = { high: 0, medium: 0, low: 0, unclassified: 0 }
-  for (const a of audit) {
-    if (a.deprecatedRisk) riskCounts[a.deprecatedRisk]++
-    else riskCounts.unclassified++
-  }
   const youtubeCandidates = audit.filter((a) => a.youtubeCandidate === true)
 
   lines.push('## Summary')
   lines.push('')
-  lines.push(`- Articles audited: ${audit.length}`)
-  lines.push(`- Average word count: ${avgWordCount}`)
-  lines.push(`- Short articles (<120 words): ${shortCount}`)
-  lines.push(`- Articles with brand leaks: ${leakArticles.length} (${totalLeaks} total hits)`)
-  lines.push(`- Articles with external (non-Supabase) images: ${externalImageArticles.length}`)
-  lines.push(`- Total images: ${totalImages} (${totalExternalImages} external)`)
-  lines.push(`- Average quality (1-5, classified articles only): ${avgQuality}`)
+  lines.push(`- Articles audited: ${summary.articleCount}`)
+  lines.push(`- Average word count: ${summary.avgWordCount}`)
+  lines.push(`- Short articles (<120 words): ${summary.shortCount}`)
+  lines.push(`- Articles with brand leaks: ${summary.leakArticleCount} (${summary.totalLeaks} total hits)`)
+  lines.push(`- Articles with external (non-Supabase) images: ${summary.externalImageArticleCount}`)
+  lines.push(`- Total images: ${summary.totalImages} (${summary.totalExternalImages} external)`)
   lines.push(
-    `- Deprecated risk: ${riskCounts.high} high, ${riskCounts.medium} medium, ${riskCounts.low} low, ${riskCounts.unclassified} unclassified`,
+    `- Average quality (1-5, classified articles only): ${summary.avgQuality !== null ? summary.avgQuality.toFixed(1) : 'n/a'}`,
   )
-  lines.push(`- YouTube candidates: ${youtubeCandidates.length}`)
+  lines.push(
+    `- Deprecated risk: ${summary.riskCounts.high} high, ${summary.riskCounts.medium} medium, ${summary.riskCounts.low} low, ${summary.riskCounts.unclassified} unclassified`,
+  )
+  lines.push(`- YouTube candidates: ${summary.youtubeCandidateCount}`)
   lines.push('')
 
   // Brand leaks
@@ -84,7 +73,7 @@ function main() {
         lines.push(`| ${mdEscape(a.title)} (${a.slug}) | ${leak.location} | ${mdEscape(leak.snippet)} |`)
         rows++
         if (rows >= 200) {
-          lines.push(`| ... | | *(truncated at 200 rows, ${totalLeaks - rows} more not shown)* |`)
+          lines.push(`| ... | | *(truncated at 200 rows, ${summary.totalLeaks - rows} more not shown)* |`)
           break outer
         }
       }

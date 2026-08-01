@@ -16,7 +16,8 @@
     "ops:audit": "tsx scripts/content-ops/audit.mts",
     "ops:gap": "tsx scripts/content-ops/gap.mts",
     "ops:rewrite": "tsx scripts/content-ops/rewrite.mts",
-    "ops:report": "tsx scripts/content-ops/report.mts"
+    "ops:report": "tsx scripts/content-ops/report.mts",
+    "ops:push": "tsx scripts/content-ops/push.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
