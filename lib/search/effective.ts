@@ -51,7 +51,7 @@ export async function getEffectiveArticleForIndexing(
     publishedAt: row.published_at,
   }
 
-  return mergeArticle(canonical, {
+  const effective = mergeArticle(canonical, {
     helpCenterId: data.help_center_id,
     articleId: data.article_id,
     position: data.position,
@@ -61,4 +61,10 @@ export async function getEffectiveArticleForIndexing(
     bodyHtmlOverride: data.body_html_override,
     collectionOverrideId: data.collection_override_id,
   })
+
+  // An article with no effective collection has no public URL (the article
+  // page 404s without one), so it must not appear in search either.
+  if (!effective.collectionId) return null
+
+  return effective
 }

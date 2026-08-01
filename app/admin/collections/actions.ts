@@ -5,6 +5,7 @@ import { serviceClient } from '@/lib/db/client'
 import { authorize } from '@/lib/authz/authorize'
 import { slugify, uniqueSlug } from '@/lib/content/slug'
 import { getActiveHelpCenter } from '@/lib/tenancy/active'
+import { reindexArticleEverywhere } from '@/lib/search/index-article'
 
 export async function createCollection(formData: FormData): Promise<void> {
   const helpCenter = await getActiveHelpCenter()
@@ -56,8 +57,39 @@ export async function deleteCollection(formData: FormData): Promise<void> {
   await authorize('collection.delete', { helpCenterId: helpCenter.id })
 
   const id = String(formData.get('id') ?? '')
-  const { error } = await serviceClient().from('collections').delete().eq('id', id)
+  const db = serviceClient()
+
+  // Collect the articles that lose this collection before the FKs null out
+  // their collection ids, so they can be reindexed after the delete.
+  const { data: canonical, error: canonicalError } = await db
+    .from('articles')
+    .select('id')
+    .eq('collection_id', id)
+  if (canonicalError) {
+    throw new Error(`Could not read articles in collection: ${canonicalError.message}`)
+  }
+
+  const { data: overridden, error: overriddenError } = await db
+    .from('help_center_articles')
+    .select('article_id')
+    .eq('collection_override_id', id)
+  if (overriddenError) {
+    throw new Error(`Could not read article placements in collection: ${overriddenError.message}`)
+  }
+
+  const affectedArticleIds = new Set([
+    ...(canonical ?? []).map((r) => r.id),
+    ...(overridden ?? []).map((r) => r.article_id),
+  ])
+
+  const { error } = await db.from('collections').delete().eq('id', id)
   if (error) throw new Error(`Could not delete collection: ${error.message}`)
+
+  // Articles left without an effective collection have no public URL, so
+  // reindexing drops them from search (see getEffectiveArticleForIndexing).
+  for (const articleId of affectedArticleIds) {
+    await reindexArticleEverywhere(articleId)
+  }
 
   revalidatePath('/admin/collections')
   revalidatePath('/')
