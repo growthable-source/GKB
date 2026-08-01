@@ -51,29 +51,35 @@
 **Files:**
 - Create: `package.json`, `tsconfig.json`, `next.config.ts`, `postcss.config.mjs`, `app/layout.tsx`, `app/globals.css`, `vitest.config.ts`, `.env.local.example`, `.gitignore` (modify)
 
-- [ ] **Step 1: Create the Next.js app in the existing directory**
+- [x] **Step 1: Create the Next.js app in the existing directory**
 
-Run from the repo root:
+`--src-dir false` is not a valid create-next-app flag; use `--no-src-dir` instead. Also, create-next-app refuses to scaffold into a directory whose package name (derived from the directory name) contains capital letters — `GKB` triggers this. What actually worked: move `README.md` and `.gitignore` aside, scaffold into a scratch directory with a lowercase name, then `rsync` the generated files (excluding `node_modules` and `.git`) into the repo root, rename `"name"` back to `"gkb"` in `package.json`, and restore/merge our `README.md` and `.gitignore`:
 
 ```bash
-pnpm create next-app@latest . --ts --tailwind --app --eslint --src-dir false --import-alias "@/*" --use-pnpm --yes
+mkdir -p /tmp/scaffold-tmp
+cd /tmp/scaffold-tmp
+pnpm create next-app@latest gkb-app --ts --tailwind --app --eslint --no-src-dir --import-alias "@/*" --use-pnpm --yes --disable-git
+rsync -a --exclude 'node_modules' --exclude '.git' /tmp/scaffold-tmp/gkb-app/ /Users/ryan/GKB/
+# then: fix package.json "name" to "gkb", restore our README.md, merge .gitignore (dedup)
 ```
 
-If it refuses because the directory is not empty, answer yes to proceed; it preserves `README.md`, `docs/`, and `.git`.
+Additionally, `pnpm install` in this environment blocks on native postinstall scripts (`sharp`, `unrs-resolver`) unless approved/denied explicitly. Ran `pnpm approve-builds` and declined both (they're optional; not needed for this scaffold) — this also required regenerating `pnpm-lock.yaml`/`node_modules` inside the real repo directory via a plain `pnpm install` after the copy.
 
-- [ ] **Step 2: Install runtime dependencies**
+Also note: our `.gitignore`'s Next.js-generated `.env*` line ignores `.env.local.example` too. Added `!.env.local.example` at the end of the env-files block so the template stays trackable.
+
+- [x] **Step 2: Install runtime dependencies**
 
 ```bash
 pnpm add @supabase/supabase-js @supabase/ssr sanitize-html @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-link @tiptap/extension-image @tiptap/extension-placeholder lucide-react clsx tailwind-merge
 ```
 
-- [ ] **Step 3: Install dev dependencies**
+- [x] **Step 3: Install dev dependencies**
 
 ```bash
 pnpm add -D vitest @types/sanitize-html supabase
 ```
 
-- [ ] **Step 4: Create the Vitest config**
+- [x] **Step 4: Create the Vitest config**
 
 Create `vitest.config.ts`:
 
@@ -92,7 +98,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 5: Add scripts to `package.json`**
+- [x] **Step 5: Add scripts to `package.json`**
 
 Add these entries to the `scripts` object, keeping the existing `dev`, `build`, `start`, and `lint`:
 
@@ -106,7 +112,7 @@ Add these entries to the `scripts` object, keeping the existing `dev`, `build`, 
 }
 ```
 
-- [ ] **Step 6: Create the environment template**
+- [x] **Step 6: Create the environment template**
 
 Create `.env.local.example`:
 
@@ -116,7 +122,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-- [ ] **Step 7: Ignore local Supabase state**
+Correction (Task 2): this machine's `supabase/config.toml` was reassigned to non-default ports to avoid
+colliding with other local Supabase projects, so the actual `.env.local`/`.env.local.example` API URL
+is `http://127.0.0.1:54721`, not `54321`.
+
+- [x] **Step 7: Ignore local Supabase state**
 
 Append to `.gitignore`:
 
@@ -126,12 +136,12 @@ supabase/.branches
 .env.local
 ```
 
-- [ ] **Step 8: Verify the app builds**
+- [x] **Step 8: Verify the app builds**
 
 Run: `pnpm build`
 Expected: build completes with no errors.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add -A
@@ -153,6 +163,12 @@ pnpm supabase start
 ```
 
 Expected: prints an API URL, anon key, and service role key. Copy them into `.env.local`.
+
+Correction: if this machine already has other local Supabase projects running (check with
+`docker ps --format '{{.Names}}\t{{.Ports}}'`), the default ports (54321-54329) will collide and
+`pnpm supabase start` will fail with `port is already allocated`. Fix by editing the port numbers in
+`supabase/config.toml` (`api.port`, `db.port`, `db.shadow_port`, `db.pooler.port`, `studio.port`,
+`local_smtp.port`, and the analytics port near the bottom) to an unused range, then retry.
 
 - [ ] **Step 2: Write the migration**
 
@@ -211,15 +227,23 @@ Expected: `Applying migration 0001_initial_schema.sql...` then `Seeding data sup
 - [ ] **Step 5: Verify the base help center exists**
 
 ```bash
-pnpm supabase db execute --local "select slug, is_base from help_centers"
+pnpm supabase db query "select slug, is_base from help_centers" --local
 ```
+
+Correction: the installed CLI (supabase 2.110.0) has no `db execute` subcommand; the working
+equivalent is `supabase db query <sql> --local`.
 
 Expected: one row, `base | t`.
 
 - [ ] **Step 6: Generate types**
 
-Run: `pnpm db:types`
+Run: `mkdir -p lib/db && pnpm db:types`
 Expected: `lib/db/types.ts` created containing `export type Database`.
+
+Correction: the `lib/db` directory does not exist yet on a fresh checkout (Task 1 does not create
+`lib/`), and shell output redirection (`> lib/db/types.ts`) does not create missing parent
+directories, so the bare `pnpm db:types` command fails with `No such file or directory` until the
+directory exists.
 
 - [ ] **Step 7: Commit**
 
@@ -458,7 +482,7 @@ Create `lib/content/merge.ts`:
 import type { ArticlePlacement, CanonicalArticle, EffectiveArticle } from './types'
 
 /** Null, empty, and whitespace-only override values all mean "inherit". */
-function override(value: string | null | undefined): string | null {
+function normalizeOverride(value: string | null | undefined): string | null {
   if (value == null) return null
   return value.trim() === '' ? null : value
 }
@@ -467,7 +491,7 @@ export function mergeArticle(
   canonical: CanonicalArticle,
   placement: ArticlePlacement | null,
 ): EffectiveArticle {
-  const title = override(placement?.titleOverride)
+  const title = normalizeOverride(placement?.titleOverride)
 
   return {
     ...canonical,
@@ -551,8 +575,29 @@ describe('mergeArticle collection', () => {
     expect(result.collectionId).toBe('c2')
     expect(result.isOverridden).toBe(true)
   })
-})
 
+  it('does not count a collection override that matches the canonical value', () => {
+    const result = mergeArticle(canonical, { ...placement, collectionOverrideId: 'c1' })
+    expect(result.collectionId).toBe('c1')
+    expect(result.isOverridden).toBe(false)
+  })
+})
+```
+
+This step also appends one more test to the `mergeArticle title` describe block from Task 5, closing the same gap for the title field:
+
+```ts
+  it('does not count a title override that matches the canonical value', () => {
+    const result = mergeArticle(canonical, {
+      ...placement,
+      titleOverride: 'Cancel your subscription',
+    })
+    expect(result.title).toBe('Cancel your subscription')
+    expect(result.isOverridden).toBe(false)
+  })
+```
+
+```ts
 describe('mergeArticle placement flags', () => {
   it('carries position and hidden through', () => {
     const result = mergeArticle(canonical, { ...placement, position: 7, isHidden: true })
@@ -571,7 +616,9 @@ describe('mergeArticle placement flags', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: FAIL — the body override tests fail because `mergeArticle` ignores body fields.
+Expected: FAIL — the body override tests fail because `mergeArticle` ignores body fields; the two
+"does not count a ... override that matches the canonical value" tests fail because `isOverridden`
+is set from mere presence of an override field rather than whether it changes the effective value.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -582,13 +629,20 @@ export function mergeArticle(
   canonical: CanonicalArticle,
   placement: ArticlePlacement | null,
 ): EffectiveArticle {
-  const title = override(placement?.titleOverride)
-  const bodyHtml = override(placement?.bodyHtmlOverride)
+  const title = normalizeOverride(placement?.titleOverride)
+  const bodyHtml = normalizeOverride(placement?.bodyHtmlOverride)
   const collectionId = placement?.collectionOverrideId ?? null
 
   // Body json and html are a pair. Html is what renders, so an override only
   // counts when html is present; json follows it when supplied.
   const bodyJson = bodyHtml !== null ? (placement?.bodyJsonOverride ?? canonical.bodyJson) : canonical.bodyJson
+
+  // An override only counts toward isOverridden when it actually changes the
+  // effective value — a placement field equal to the canonical value is a
+  // no-op, not a local edit.
+  const titleChanged = title !== null && title !== canonical.title
+  const bodyChanged = bodyHtml !== null && bodyHtml !== canonical.bodyHtml
+  const collectionChanged = collectionId !== null && collectionId !== canonical.collectionId
 
   return {
     ...canonical,
@@ -598,7 +652,7 @@ export function mergeArticle(
     collectionId: collectionId ?? canonical.collectionId,
     position: placement?.position ?? 0,
     isHidden: placement?.isHidden ?? false,
-    isOverridden: title !== null || bodyHtml !== null || collectionId !== null,
+    isOverridden: titleChanged || bodyChanged || collectionChanged,
   }
 }
 ```
@@ -606,7 +660,7 @@ export function mergeArticle(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: PASS — 12 tests.
+Expected: PASS — 15 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -678,13 +732,31 @@ describe('mergeCollection', () => {
     expect(result.isHidden).toBe(true)
     expect(result.audience).toBe('authenticated')
   })
+
+  it('defaults audience to authenticated to fail closed without a placement', () => {
+    const result = mergeCollection(canonicalCollection, null)
+    expect(result.audience).toBe('authenticated')
+  })
+
+  it('does not count title or description overrides that match the canonical values', () => {
+    const result = mergeCollection(canonicalCollection, {
+      ...collectionPlacement,
+      titleOverride: 'Billing',
+      descriptionOverride: 'Invoices and payments.',
+    })
+    expect(result.title).toBe('Billing')
+    expect(result.description).toBe('Invoices and payments.')
+    expect(result.isOverridden).toBe(false)
+  })
 })
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: FAIL — `mergeCollection is not a function`.
+Expected: FAIL — `mergeCollection is not a function`. Once `mergeCollection` exists, the
+"defaults audience to authenticated" test still fails until the default below is changed from
+`'public'` to `'authenticated'`, because audience must fail closed when there is no placement row.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -701,8 +773,13 @@ export function mergeCollection(
   canonical: CanonicalCollection,
   placement: CollectionPlacement | null,
 ): EffectiveCollection {
-  const title = override(placement?.titleOverride)
-  const description = override(placement?.descriptionOverride)
+  const title = normalizeOverride(placement?.titleOverride)
+  const description = normalizeOverride(placement?.descriptionOverride)
+
+  // Same rule as mergeArticle: a placement value equal to the canonical value
+  // is a no-op, not a local edit.
+  const titleChanged = title !== null && title !== canonical.title
+  const descriptionChanged = description !== null && description !== canonical.description
 
   return {
     ...canonical,
@@ -710,7 +787,11 @@ export function mergeCollection(
     description: description ?? canonical.description,
     position: placement?.position ?? 0,
     isHidden: placement?.isHidden ?? false,
-    audience: placement?.audience ?? 'public',
+    // Fail closed: without a placement row there is no record of who may see
+    // this collection, so treat it as gated rather than defaulting to public
+    // and risking a leak. Queries always join a real placement row; this
+    // default only guards the case where one is missing.
+    audience: placement?.audience ?? 'authenticated',
     isOverridden: title !== null || description !== null,
   }
 }
@@ -721,7 +802,7 @@ Move the `import type` line to join the existing type import at the top of the f
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/merge.test.ts`
-Expected: PASS — 15 tests.
+Expected: PASS — 20 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -842,6 +923,7 @@ git commit -m "feat: add slug generation"
 Create `lib/content/html.test.ts`:
 
 ```ts
+import sanitizeHtml from 'sanitize-html'
 import { describe, expect, it } from 'vitest'
 import { htmlToText, sanitizeArticleHtml } from './html'
 
@@ -870,6 +952,23 @@ describe('sanitizeArticleHtml', () => {
   })
 })
 
+describe('render-boundary defense for search headlines', () => {
+  // htmlToText's output (body_text) is not guaranteed free of "<" — see the
+  // comment on htmlToText. The XSS defense for its one HTML-rendered
+  // consumer lives here instead: Postgres ts_headline wraps matches in
+  // body_text with <mark> and does not escape the rest of the string, so
+  // lib/search/search.ts re-sanitizes ts_headline's output down to
+  // allowedTags: ['mark'] before it is ever rendered. This test documents
+  // and locks in that guarantee.
+  it('strips everything except <mark> from ts_headline-shaped input', () => {
+    const headline = sanitizeHtml('<script>alert(1)</script> and <mark>hit</mark>', {
+      allowedTags: ['mark'],
+      allowedAttributes: {},
+    })
+    expect(headline).toBe(' and <mark>hit</mark>')
+  })
+})
+
 describe('htmlToText', () => {
   it('returns readable text with words separated', () => {
     expect(htmlToText('<h2>Billing</h2><p>Cancel <em>anytime</em>.</p>')).toBe(
@@ -883,6 +982,55 @@ describe('htmlToText', () => {
 
   it('returns an empty string for empty input', () => {
     expect(htmlToText('')).toBe('')
+  })
+
+  it('never lets an unclosed tag survive as markup', () => {
+    const result = htmlToText('<p>hi<img src=x onerror=alert(1)')
+    expect(result).not.toContain('<')
+    expect(result).not.toContain('onerror')
+  })
+
+  it('preserves prose that merely contains angle brackets', () => {
+    expect(htmlToText('a < b and c > d')).toBe('a < b and c > d')
+  })
+
+  it('decodes named entities', () => {
+    expect(htmlToText('<p>Tom &amp; Jerry said &quot;hi&quot;</p>')).toBe(
+      'Tom & Jerry said "hi"',
+    )
+  })
+
+  it('decodes an escaped angle bracket back to prose', () => {
+    expect(htmlToText('<p>5 &lt; 10</p>')).toBe('5 < 10')
+  })
+
+  it('decodes numeric entities into inert text, not markup', () => {
+    const result = htmlToText('&#106;avascript:alert(1)')
+    expect(result).toBe('javascript:alert(1)')
+    expect(result).not.toContain('<')
+  })
+
+  it('strips a nested/malformed script attempt entirely', () => {
+    const result = htmlToText('<scr<script>ipt>alert(1)</script>')
+    expect(result).not.toContain('<')
+    expect(result.toLowerCase()).not.toContain('script')
+  })
+
+  // SECURITY: decoding entities more than once is a bug, not an improvement.
+  // Double-encoded input like "&amp;lt;script&amp;gt;" must decode to the
+  // single-decoded literal text "&lt;script&gt;" — what a reader actually
+  // typed — and go no further. A second decode pass would turn that inert
+  // text into live-looking "<script>" markup. Do not add one.
+  it('decodes double-encoded input exactly once, not into live markup', () => {
+    expect(htmlToText('&amp;lt;script&amp;gt;')).toBe('&lt;script&gt;')
+  })
+
+  it('decodes a double-encoded ampersand exactly once', () => {
+    expect(htmlToText('&amp;amp;')).toBe('&amp;')
+  })
+
+  it('decodes a double-encoded numeric reference exactly once', () => {
+    expect(htmlToText('&amp;#60;')).toBe('&#60;')
   })
 })
 ```
@@ -920,18 +1068,90 @@ export function sanitizeArticleHtml(html: string): string {
   return sanitizeHtml(html, ARTICLE_OPTIONS)
 }
 
-/** Plain text for search indexing and excerpts. */
+/**
+ * Decodes the handful of HTML entities that can appear in sanitizer output
+ * (named entities plus numeric character references) so callers get genuine
+ * plain text rather than escaped markup. `&amp;` is decoded last so an
+ * entity like `&amp;lt;` does not double-decode into `<`.
+ *
+ * SECURITY: callers must invoke this exactly once per input. Decoding twice
+ * (or looping until a fixed point) can turn inert escaped text such as
+ * `&amp;lt;script&amp;gt;` — which decodes once to the harmless literal
+ * string `&lt;script&gt;` — into live-looking markup `<script>` on a second
+ * pass. `htmlToText` below relies on single-decode semantics for safety; do
+ * not add a second call to "helpfully" catch more entities.
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+}
+
+/**
+ * Plain text for search indexing and excerpts.
+ *
+ * Hand-rolled tag stripping (a regex like `/<[^>]+>/g`) is unsafe here: it
+ * cannot see across an unclosed tag, so a fragment like `<img src=x
+ * onerror=alert(1)` (no closing `>`) survives verbatim, and a naive "delete
+ * everything between < and >" approach also destroys legitimate prose like
+ * "a < b and c > d". Instead this parses the input with the real HTML parser
+ * first — which normalizes and closes malformed markup and escapes bare `<`
+ * in prose to `&lt;` — before tag boundaries are turned into spaces and any
+ * remaining tags are stripped. Entities are decoded exactly once at the end
+ * so the result is genuine plain text.
+ *
+ * This function does NOT guarantee its output is free of `<` — plain text
+ * can legitimately contain it (e.g. "if x < y"), and there is no safe way to
+ * strip it without also destroying real prose or reopening the double-decode
+ * bug described on `decodeHtmlEntities`. XSS safety for the two consumers of
+ * this text is enforced elsewhere: `body_text` is only ever rendered through
+ * `ts_headline`, whose output is re-sanitized down to `allowedTags: ['mark']`
+ * before it reaches the page (see `searchHelpCenter` in
+ * `lib/search/search.ts`), and `excerpt` is rendered through JSX, which
+ * escapes text nodes automatically. Do not add tag-stripping here to
+ * compensate for a render site that fails to sanitize or escape — fix that
+ * render site instead.
+ */
 export function htmlToText(html: string): string {
-  return sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} })
-    .replace(/\s+/g, ' ')
-    .trim()
+  const wellFormed = sanitizeHtml(html, ARTICLE_OPTIONS)
+  const spaced = wellFormed.replace(/<[^>]+>/g, ' ')
+  const stripped = sanitizeHtml(spaced, { allowedTags: [], allowedAttributes: {} })
+  return decodeHtmlEntities(stripped).replace(/\s+/g, ' ').trim()
 }
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm vitest run lib/content/html.test.ts`
-Expected: PASS — 8 tests. If the link test fails because `rel` is added to the bare `<a>`, change that assertion to `expect(...).not.toContain('javascript:')` — never weaken the sanitizer to satisfy the test.
+Expected: PASS — 18 tests. If the link test fails because `rel` is added to the bare `<a>`, change that assertion to `expect(...).not.toContain('javascript:')` — never weaken the sanitizer to satisfy the test.
+
+Correction: the plan's original `htmlToText` implementation (a single `sanitizeHtml({allowedTags: []})`
+call) has two real bugs found in adversarial review: it only matches tags with a closing `>`, so an
+unclosed tag like `<img src=x onerror=alert(1)` (no `>`) survives verbatim in the output, and stripping
+tag boundaries without first parsing malformed markup destroys legitimate prose like `"a < b and c > d"`.
+The fix is to parse first with the real parser (`sanitizeHtml` with `ARTICLE_OPTIONS`, which normalizes
+and closes malformed tags and escapes bare `<` in prose to `&lt;`), then space out tag boundaries, strip
+what remains, and decode HTML entities exactly once.
+
+An earlier attempted fix added a second parse-and-decode pass to catch tag-like text reconstituted by
+decoding (e.g. an orphaned `&lt;/script&gt;`). That was itself a bug: double-encoded input such as
+`&amp;lt;script&amp;gt;` decodes once to the inert literal text `&lt;script&gt;`, but a second decode
+pass turns that same text into live `<script>` markup — the "fix" reopened the exact hole it was meant
+to close, and no amount of further passes would end the arms race. The correct model is that
+`htmlToText` returns honest plain text, which can legitimately contain `<` (e.g. "if x < y"), and that
+XSS safety belongs at the render boundary, not in the text extractor: `body_text` is only ever rendered
+through `ts_headline`, whose output is re-sanitized down to `allowedTags: ['mark']` in Task 14's
+`searchHelpCenter` before reaching the page, and `excerpt` is rendered through JSX, which escapes text
+automatically. The implementation above reflects the final, single-decode design; the test count grew
+from the original 8 to 18, covering the malformed-markup, prose-preservation, entity-decoding, and
+single-decode-safety cases, and adding one test (in the `render-boundary defense` describe block) that
+locks in the `allowedTags: ['mark']` guarantee Task 14 depends on.
 
 - [ ] **Step 5: Commit**
 
@@ -968,6 +1188,20 @@ export type ActiveHelpCenter = {
   settings: { headline?: string; subtitle?: string }
 }
 
+const VALID_VISIBILITIES = ['public', 'authenticated'] as const
+
+/**
+ * Narrows the raw `visibility` column to the known union, throwing rather
+ * than letting an unexpected value silently flow into access-gating logic —
+ * this field decides whether the whole help center is publicly readable.
+ */
+function parseVisibility(value: string): ActiveHelpCenter['visibility'] {
+  if ((VALID_VISIBILITIES as readonly string[]).includes(value)) {
+    return value as ActiveHelpCenter['visibility']
+  }
+  throw new Error(`Unexpected help_centers.visibility value: ${value}`)
+}
+
 /**
  * The help center serving the current request. Phase 1 always returns the base
  * center; Phase 2 resolves it from the Host header.
@@ -990,11 +1224,16 @@ export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => 
     primaryHex: data.primary_hex,
     secondaryHex: data.secondary_hex,
     logoUrl: data.logo_url,
-    visibility: data.visibility as ActiveHelpCenter['visibility'],
+    visibility: parseVisibility(data.visibility),
     settings: (data.settings ?? {}) as ActiveHelpCenter['settings'],
   }
 })
 ```
+
+Correction: `data.visibility as ActiveHelpCenter['visibility']` is an unchecked cast on a field that
+gates access to the whole help center. `parseVisibility` validates it at runtime against the known
+union and throws a clear error otherwise, rather than letting an unexpected column value flow into
+gating logic unchecked. The `settings` cast is left as-is.
 
 - [ ] **Step 2: Verify it type-checks**
 
@@ -1590,6 +1829,7 @@ Expected: `lib/db/types.ts` now includes `search_help_center` under `Functions`.
 Create `lib/search/search.ts`:
 
 ```ts
+import sanitizeHtml from 'sanitize-html'
 import { serviceClient } from '@/lib/db/client'
 
 export type SearchHit = {
@@ -1620,7 +1860,11 @@ export async function searchHelpCenter(
     articleId: row.article_id,
     slug: row.slug,
     title: row.title,
-    headline: row.headline ?? '',
+    // ts_headline does not escape its input, so body_text is re-parsed as HTML
+    // here and only the <mark> tags it introduced are allowed to survive —
+    // this is the last line of defense before the headline is ever rendered
+    // with dangerouslySetInnerHTML.
+    headline: sanitizeHtml(row.headline ?? '', { allowedTags: ['mark'], allowedAttributes: {} }),
   }))
 }
 ```
@@ -1636,6 +1880,42 @@ Expected: no errors.
 git add supabase/migrations/0002_search_function.sql lib/search/search.ts lib/db/types.ts
 git commit -m "feat: add keyword search within a help center"
 ```
+
+---
+
+## Task 14b: Database grants (added during execution)
+
+**Files:**
+- Create: `supabase/migrations/0003_grants.sql`
+
+This task was not in the original plan. Review of Tasks 12-14 found that no Supabase API
+role had DML privileges on the tables created by migration 0001 — `service_role` held only
+`REFERENCES`, `TRIGGER`, and `TRUNCATE`, so every server-side query failed with
+`permission denied for table ...`. Nothing above Task 14 would have worked.
+
+- [ ] **Step 1: Grant privileges to the server role only**
+
+Create `supabase/migrations/0003_grants.sql` granting `usage` on schema `public` and all
+table, sequence, and function privileges to `service_role`, plus matching
+`alter default privileges` so future objects inherit them.
+
+Grant `anon` and `authenticated` NOTHING on public tables. RLS does not arrive until
+Phase 3, so any SELECT granted to those browser-reachable roles today would expose every
+draft and hidden article to anyone holding the public anon key. Grant them read access in
+the same change that enables RLS, never before.
+
+- [ ] **Step 2: Verify both halves of the posture**
+
+```bash
+pnpm db:reset
+```
+
+Then confirm with the real PostgREST path — not just `information_schema` — that
+`service_role` can select from a table and call `search_help_center`, and that `anon`
+receives `permission denied for table articles`. Both outcomes are required: the first
+proves the app works, the second proves nothing leaks.
+
+Because this migration takes the number `0003`, Task 18's storage migration is `0004`.
 
 ---
 
@@ -1682,6 +1962,10 @@ export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|svg|webp)$).*)'],
 }
 ```
+
+Next 16 still runs `middleware.ts` and honours `export const config`, but prints
+"The \"middleware\" file convention is deprecated. Please use \"proxy\" instead."
+Renaming to `proxy.ts` is a separate, later change.
 
 - [ ] **Step 2: Write the login action**
 
@@ -1763,16 +2047,28 @@ export default function LoginPage() {
 
 Create `app/auth/confirm/route.ts`:
 
+First create `lib/auth/safe-next.ts` exporting `DEFAULT_NEXT = '/admin/articles'` and
+`safeNext(raw)`, which returns `DEFAULT_NEXT` unless `raw` is a same-origin relative path —
+rejecting absolute URLs, and rejecting `//` and `/\` prefixes because both are
+protocol-relative and resolve off-origin. Cover it in `lib/auth/safe-next.test.ts`.
+
+**This validation is required, not optional.** Passing the raw `next` parameter to
+`redirect()` is an open redirect: an attacker sends a link on our own domain that signs the
+victim in and then bounces them to an attacker-controlled page, borrowing the domain's
+trust. This was found and fixed during execution after being reproduced against a live
+session.
+
 ```ts
 import { type EmailOtpType } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { userClient } from '@/lib/db/client'
+import { safeNext } from '@/lib/auth/safe-next'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const token_hash = url.searchParams.get('token_hash')
   const type = url.searchParams.get('type') as EmailOtpType | null
-  const next = url.searchParams.get('next') ?? '/admin/articles'
+  const next = safeNext(url.searchParams.get('next'))
 
   if (!token_hash || !type) redirect('/login?error=invalid-link')
 
@@ -1830,13 +2126,52 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 }
 ```
 
+- [ ] **Step 5b: Point the magic-link email at `/auth/confirm`**
+
+The route above verifies the OTP server-side from a `token_hash`. GoTrue's default
+`{{ .ConfirmationURL }}` instead sends the browser to its own `/verify` endpoint,
+which returns the session in a URL *fragment* the server can never read — the
+confirm route is never reached and no cookies are set. Override the template.
+
+Create `supabase/templates/magic_link.html`:
+
+```html
+<h2>Sign in to the help center</h2>
+<p>
+  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Sign in</a>
+</p>
+<p>If you did not request this link you can ignore this email.</p>
+```
+
+In `supabase/config.toml`, under `[auth]`, align the URLs with `NEXT_PUBLIC_SITE_URL`
+(GoTrue silently falls back to `site_url` when `redirect_to` is not allow-listed):
+
+```toml
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
+```
+
+and register the template:
+
+```toml
+[auth.email.template.magic_link]
+subject = "Sign in to the help center"
+content_path = "./supabase/templates/magic_link.html"
+```
+
+Restart for the config to take effect: `pnpm supabase stop && pnpm supabase start`.
+
 - [ ] **Step 6: Create an owner membership for yourself**
 
-Sign in once at `http://localhost:3000/login` (local Supabase captures mail at `http://127.0.0.1:54324`), then run:
+Sign in once at `http://localhost:3000/login` (local Supabase captures mail at
+`http://127.0.0.1:54724`, Mailpit), then run:
 
 ```bash
-pnpm supabase db execute --local "insert into memberships (user_id, help_center_id, role) select id, null, 'owner' from auth.users order by created_at limit 1 on conflict do nothing"
+pnpm supabase db query "insert into memberships (user_id, help_center_id, role) select id, null, 'owner' from auth.users where email='owner@example.com' on conflict do nothing" --local
 ```
+
+`memberships_scope_matches_role` only permits a NULL `help_center_id` for
+`owner` and `staff`.
 
 - [ ] **Step 7: Verify the gate works**
 
@@ -1846,7 +2181,8 @@ Expected: redirect to `/login`. After signing in, the admin shell renders.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add middleware.ts app/login app/auth app/admin/layout.tsx .env.local.example
+git add middleware.ts app/login app/auth app/admin/layout.tsx .env.local.example \
+  supabase/config.toml supabase/templates/magic_link.html
 git commit -m "feat: add magic-link auth and admin gate"
 ```
 
@@ -2143,6 +2479,7 @@ import { sanitizeArticleHtml, htmlToText } from '@/lib/content/html'
 import { slugify, uniqueSlug } from '@/lib/content/slug'
 import { getActiveHelpCenter } from '@/lib/tenancy/active'
 import { indexArticle } from '@/lib/search/index-article'
+import type { Json } from '@/lib/db/types'
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }
 
@@ -2192,7 +2529,9 @@ export async function saveArticle(input: {
     .update({
       title,
       collection_id: input.collectionId,
-      body_json: input.bodyJson,
+      // The editor's ProseMirror document is structurally JSON; TypeScript
+      // cannot see that through `Record<string, unknown>`.
+      body_json: input.bodyJson as Json,
       body_html: bodyHtml,
       excerpt,
     })
@@ -2358,12 +2697,12 @@ git commit -m "feat: add article editor with publish"
 ## Task 18: Article image upload
 
 **Files:**
-- Create: `supabase/migrations/0003_storage_bucket.sql`, `app/api/uploads/route.ts`
+- Create: `supabase/migrations/0004_storage_bucket.sql`, `app/api/uploads/route.ts`
 - Modify: `components/editor/article-editor.tsx`
 
 - [ ] **Step 1: Create the storage bucket**
 
-Create `supabase/migrations/0003_storage_bucket.sql`:
+Create `supabase/migrations/0004_storage_bucket.sql`:
 
 ```sql
 insert into storage.buckets (id, name, public)
@@ -2478,7 +2817,7 @@ Expected: the image renders in the editor, and after Save and publish it renders
 - [ ] **Step 5: Commit**
 
 ```bash
-git add supabase/migrations/0003_storage_bucket.sql app/api/uploads components/editor
+git add supabase/migrations/0004_storage_bucket.sql app/api/uploads components/editor
 git commit -m "feat: upload article images to storage"
 ```
 
@@ -3182,14 +3521,31 @@ Append to `.gitignore`:
 
 - [ ] **Step 4: Write the test**
 
-This test signs in by requesting a magic link and reading it from the local Inbucket mail API that `supabase start` runs on port 54324.
+This test signs in by requesting a magic link and reading it from the local mail API that
+`supabase start` runs on port 54724.
+
+Correction (Task 2): CLI 2.110.0 ships **Mailpit**, not Inbucket, on this port (confirmed via
+`pnpm supabase status`, which reports `MAILPIT_URL`/`INBUCKET_URL` both pointing at
+`http://127.0.0.1:54724`, and empirically: `curl http://127.0.0.1:54724/api/v1/mailbox` returns
+`File not found`, while `curl http://127.0.0.1:54724/api/v1/messages` returns Mailpit's JSON list
+shape). Mailpit's API is list-then-fetch, not mailbox-by-address:
+
+- `GET /api/v1/messages` — lists all messages across all mailboxes (no per-recipient path segment).
+  Shape: `{"messages":[{"ID":"2turEJXP1fKpceKDxu32Jr","To":[{"Name":"","Address":"..."}],"Created":"2026-07-31T03:08:57.519Z", ...}], ...}`.
+  Filter client-side by `To[].Address` and take the most recent by `Created`.
+- `GET /api/v1/message/{ID}` — fetches one message by its `ID` (from the list above). The rendered
+  HTML body is in the `HTML` field (there is also a plaintext `Text` field), e.g.
+  `{"ID":"...","HTML":"<h2>Your sign-in link</h2>...<a href=\"http://127.0.0.1:54721/auth/v1/verify?token=...&amp;type=magiclink&amp;redirect_to=...\">Sign in</a>...","Text":"..."}`.
+
+Verified empirically by triggering a real OTP email via `POST /auth/v1/otp` against the local GoTrue
+instance and reading it back through both endpoints above.
 
 Create `e2e/publish-and-read.spec.ts`:
 
 ```ts
 import { expect, test } from '@playwright/test'
 
-const MAIL_API = 'http://127.0.0.1:54324/api/v1/mailbox'
+const MAIL_API = 'http://127.0.0.1:54724/api/v1'
 const EMAIL = 'owner@example.com'
 
 async function signIn(page: import('@playwright/test').Page) {
@@ -3198,11 +3554,14 @@ async function signIn(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /email me a link/i }).click()
   await expect(page.getByText(/check your email/i)).toBeVisible()
 
-  const messages = await (await fetch(`${MAIL_API}/${EMAIL}`)).json()
-  const latest = messages[messages.length - 1]
-  const message = await (await fetch(`${MAIL_API}/${EMAIL}/${latest.id}`)).json()
+  const { messages } = await (await fetch(`${MAIL_API}/messages`)).json()
+  const latest = messages
+    .filter((m: { To: { Address: string }[] }) => m.To.some((to) => to.Address === EMAIL))
+    .sort((a: { Created: string }, b: { Created: string }) => (a.Created < b.Created ? 1 : -1))[0]
+  expect(latest, 'magic link email received').toBeTruthy()
+  const message = await (await fetch(`${MAIL_API}/message/${latest.ID}`)).json()
 
-  const link = /href="([^"]*\/auth\/confirm[^"]*)"/.exec(message.body.html)?.[1]
+  const link = /href="([^"]*\/auth\/confirm[^"]*)"/.exec(message.HTML)?.[1]
   expect(link, 'magic link in email').toBeTruthy()
 
   await page.goto(link!.replace(/&amp;/g, '&'))
