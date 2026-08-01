@@ -68,7 +68,7 @@ async function main() {
   const db = serviceClient()
   const { data: rows, error } = await db
     .from('articles')
-    .select('id, slug, title, body_html, collection_id')
+    .select('id, slug, title, body_html, body_json, collection_id')
     .in(
       'id',
       queue.map((a) => a.id),
@@ -151,6 +151,22 @@ async function main() {
       }
       const bodyHtml = sanitizeArticleHtml(draft.html)
       const bodyJson = generateJSON(bodyHtml, [StarterKit, Image])
+      // Snapshot the pre-rewrite body so an applied rewrite can be rolled back.
+      const original = bySourceId.get(a.id)
+      if (!original) {
+        failCount++
+        continue
+      }
+      const { error: revisionError } = await db.from('article_revisions').insert({
+        article_id: a.id,
+        title: original.title,
+        body_json: original.body_json,
+      })
+      if (revisionError) {
+        console.log(`  FAILED to snapshot ${a.slug}: ${revisionError.message}`)
+        failCount++
+        continue
+      }
       const { error: updateError } = await db
         .from('articles')
         .update({ body_html: bodyHtml, body_json: bodyJson })
