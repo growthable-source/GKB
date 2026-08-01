@@ -86,7 +86,7 @@ function toCollectionPlacement(row: CollectionPlacementRow): CollectionPlacement
   }
 }
 
-/** Visible, published collections for a help center, in display order. */
+/** Visible, public-audience collections for a help center, in display order. */
 export async function listEffectiveCollections(
   helpCenterId: string,
 ): Promise<EffectiveCollection[]> {
@@ -99,6 +99,11 @@ export async function listEffectiveCollections(
     )
     .eq('help_center_id', helpCenterId)
     .eq('is_hidden', false)
+    // Audience is a placement-level column with no canonical counterpart, so
+    // filtering the raw column here IS filtering the effective value. Article
+    // pages resolve their collection through this list, so gating collections
+    // gates articles too.
+    .eq('audience', 'public')
     .order('position', { ascending: true })
 
   if (error) throw new Error(`listEffectiveCollections failed: ${error.message}`)

@@ -7,7 +7,7 @@ import { authorize } from '@/lib/authz/authorize'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/content/html'
 import { slugify, uniqueSlug } from '@/lib/content/slug'
 import { getActiveHelpCenter } from '@/lib/tenancy/active'
-import { indexArticle } from '@/lib/search/index-article'
+import { reindexArticleEverywhere } from '@/lib/search/index-article'
 import type { Json } from '@/lib/db/types'
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }
@@ -68,7 +68,9 @@ export async function saveArticle(input: {
 
   if (error) throw new Error(`Could not save article: ${error.message}`)
 
-  await indexArticle(helpCenter.id, input.articleId)
+  // A save changes canonical content, which every help center that places the
+  // article inherits, so reindex all of them — not just the active one.
+  await reindexArticleEverywhere(input.articleId)
   revalidatePath('/admin/articles')
 }
 
@@ -113,7 +115,9 @@ export async function publishArticle(articleId: string): Promise<void> {
 
   if (placementError) throw new Error(`Could not place article: ${placementError.message}`)
 
-  await indexArticle(helpCenter.id, articleId)
+  // Publishing flips the status every placement reads, so reindex every help
+  // center that places the article, same as saveArticle.
+  await reindexArticleEverywhere(articleId)
   revalidatePath('/admin/articles')
   revalidatePath('/', 'layout')
 }

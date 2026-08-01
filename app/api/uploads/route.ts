@@ -3,7 +3,15 @@ import { serviceClient } from '@/lib/db/client'
 import { authorize, ForbiddenError } from '@/lib/authz/authorize'
 import { getActiveHelpCenter } from '@/lib/tenancy/active'
 
-const ALLOWED = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml']
+// SVG is deliberately absent: scripted SVG served inline from the public
+// bucket would be stored XSS. The extension comes from this map, never from
+// the client-supplied filename.
+const ALLOWED_EXTENSIONS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+}
 const MAX_BYTES = 10 * 1024 * 1024
 
 export async function POST(request: Request) {
@@ -23,14 +31,14 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 })
   }
-  if (!ALLOWED.includes(file.type)) {
+  const extension = ALLOWED_EXTENSIONS[file.type]
+  if (!extension) {
     return NextResponse.json({ error: `Unsupported type ${file.type}` }, { status: 400 })
   }
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: 'File is larger than 10MB' }, { status: 400 })
   }
 
-  const extension = file.name.split('.').pop() ?? 'bin'
   const path = `${crypto.randomUUID()}.${extension}`
 
   const db = serviceClient()

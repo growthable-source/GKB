@@ -115,7 +115,7 @@ export function ArticleEditor({
         Insert image
         <input
           type="file"
-          accept="image/*"
+          accept="image/png,image/jpeg,image/gif,image/webp"
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.[0]

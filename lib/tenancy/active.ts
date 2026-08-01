@@ -19,6 +19,8 @@ const VALID_VISIBILITIES = ['public', 'authenticated'] as const
  * than letting an unexpected value silently flow into access-gating logic —
  * this field decides whether the whole help center is publicly readable.
  */
+// NOT ENFORCED yet: public pages don't consult visibility until private help
+// centers land (Phase 3).
 function parseVisibility(value: string): ActiveHelpCenter['visibility'] {
   if ((VALID_VISIBILITIES as readonly string[]).includes(value)) {
     return value as ActiveHelpCenter['visibility']

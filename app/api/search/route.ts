@@ -11,7 +11,8 @@ export async function GET(request: Request) {
     const hits = await searchHelpCenter(helpCenter.id, query, 8)
     return NextResponse.json({ hits })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Search failed'
-    return NextResponse.json({ error: message }, { status: 500 })
+    // Log the real error server-side; the response must not leak internals.
+    console.error('Search failed:', error)
+    return NextResponse.json({ error: 'Search failed' }, { status: 500 })
   }
 }
