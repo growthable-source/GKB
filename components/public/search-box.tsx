@@ -92,7 +92,7 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
         aria-activedescendant={
           open && hits.length > 0 ? `search-box-option-${hits[active]?.articleId}` : undefined
         }
-        className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-base shadow-sm focus:border-neutral-900 focus:outline-none"
+        className="hc-search-input w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-base shadow-sm focus:outline-none"
       />
 
       {open && hits.length > 0 && (
@@ -105,7 +105,7 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
             <li key={hit.articleId} id={`search-box-option-${hit.articleId}`} role="option" aria-selected={index === active}>
               <a
                 href={`/a/${hit.slug}`}
-                className={`block px-4 py-3 ${index === active ? 'bg-neutral-100' : ''}`}
+                className={`block px-4 py-3 ${index === active ? 'hc-search-active' : ''}`}
               >
                 <span className="block text-sm font-medium">{hit.title}</span>
                 <span

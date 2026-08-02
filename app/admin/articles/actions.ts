@@ -115,8 +115,43 @@ export async function publishArticle(articleId: string): Promise<void> {
 
   if (placementError) throw new Error(`Could not place article: ${placementError.message}`)
 
+  // New articles auto-propagate to every other center that opted in, so a
+  // clone stays current without an editor visiting each admin separately.
+  const { data: autoIncludeCenters, error: autoIncludeError } = await db
+    .from('help_centers')
+    .select('id')
+    .eq('auto_include_new_articles', true)
+    .neq('id', helpCenter.id)
+  if (autoIncludeError) {
+    throw new Error(`Could not read auto-include help centers: ${autoIncludeError.message}`)
+  }
+
+  for (const center of autoIncludeCenters ?? []) {
+    // The primary center's publish already committed above — a hiccup
+    // placing this article in one auto-include center must not surface as a
+    // failure of the publish the editor just asked for, and must not stop
+    // the remaining centers (or the reindex/revalidate below) from running.
+    try {
+      const { count: centerCount } = await db
+        .from('help_center_articles')
+        .select('*', { count: 'exact', head: true })
+        .eq('help_center_id', center.id)
+
+      const { error: autoPlacementError } = await db.from('help_center_articles').upsert(
+        { help_center_id: center.id, article_id: articleId, position: centerCount ?? 0 },
+        { onConflict: 'help_center_id,article_id', ignoreDuplicates: true },
+      )
+      if (autoPlacementError) {
+        throw new Error(`Could not place article in ${center.id}: ${autoPlacementError.message}`)
+      }
+    } catch (error) {
+      console.error(`publishArticle: auto-include propagation to ${center.id} failed`, error)
+    }
+  }
+
   // Publishing flips the status every placement reads, so reindex every help
-  // center that places the article, same as saveArticle.
+  // center that places the article — this also covers the placements just
+  // added above, since reindexArticleEverywhere re-reads them from the db.
   await reindexArticleEverywhere(articleId)
   revalidatePath('/admin/articles')
   revalidatePath('/', 'layout')

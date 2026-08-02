@@ -20,7 +20,7 @@ export default async function CollectionPage({
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">
       <nav className="mb-6 text-sm text-neutral-500">
-        <Link href="/" className="hover:underline">
+        <Link href="/" className="hover:text-[color:var(--hc-primary)] hover:underline">
           All collections
         </Link>
         <span className="mx-2">/</span>

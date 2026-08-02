@@ -28,13 +28,15 @@ export default async function HomePage() {
             <li key={collection.id}>
               <Link
                 href={`/${collection.slug}`}
-                className="block h-full rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-400 hover:shadow-sm"
+                className="group block h-full rounded-xl border border-neutral-200 p-5 transition hover:border-[color:var(--hc-primary)] hover:shadow-sm"
               >
-                <h2 className="font-medium">{collection.title}</h2>
+                <h2 className="font-medium group-hover:text-[color:var(--hc-primary)]">
+                  {collection.title}
+                </h2>
                 {collection.description && (
                   <p className="mt-1 text-sm text-neutral-600">{collection.description}</p>
                 )}
-                <p className="mt-3 text-xs text-neutral-500">
+                <p className="hc-secondary-muted mt-3 text-xs">
                   {counts.get(collection.id) ?? 0} articles
                 </p>
               </Link>

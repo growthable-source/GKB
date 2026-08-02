@@ -15,6 +15,7 @@ export type Action =
   | 'collection.create'
   | 'collection.update'
   | 'collection.delete'
+  | 'helpCenter.create'
   | 'helpCenter.update'
   | 'helpCenter.delete'
 
@@ -27,12 +28,12 @@ const ALLOWED: Record<Role, Action[]> = {
   owner: [
     'article.create', 'article.update', 'article.publish', 'article.delete',
     'collection.create', 'collection.update', 'collection.delete',
-    'helpCenter.update', 'helpCenter.delete',
+    'helpCenter.create', 'helpCenter.update', 'helpCenter.delete',
   ],
   staff: [
     'article.create', 'article.update', 'article.publish', 'article.delete',
     'collection.create', 'collection.update', 'collection.delete',
-    'helpCenter.update',
+    'helpCenter.create', 'helpCenter.update',
   ],
   editor: ['article.create', 'article.update', 'article.publish', 'helpCenter.update'],
   contributor: ['article.create', 'article.update'],

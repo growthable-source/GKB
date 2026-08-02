@@ -35,11 +35,11 @@ export default async function ArticlePage({
     <div className="mx-auto flex max-w-5xl gap-12 px-5 py-12">
       <article className="min-w-0 flex-1">
         <nav className="mb-6 text-sm text-neutral-500">
-          <Link href="/" className="hover:underline">
+          <Link href="/" className="hover:text-[color:var(--hc-primary)] hover:underline">
             All collections
           </Link>
           <span className="mx-2">/</span>
-          <Link href={`/${collection.slug}`} className="hover:underline">
+          <Link href={`/${collection.slug}`} className="hover:text-[color:var(--hc-primary)] hover:underline">
             {collection.title}
           </Link>
         </nav>
@@ -54,14 +54,20 @@ export default async function ArticlePage({
 
         <div className="mt-16 flex justify-between gap-4 border-t border-neutral-200 pt-6 text-sm">
           {previous ? (
-            <Link href={`/${collection.slug}/${previous.slug}`} className="hover:underline">
+            <Link
+              href={`/${collection.slug}/${previous.slug}`}
+              className="hover:text-[color:var(--hc-primary)] hover:underline"
+            >
               ← {previous.title}
             </Link>
           ) : (
             <span />
           )}
           {next && (
-            <Link href={`/${collection.slug}/${next.slug}`} className="text-right hover:underline">
+            <Link
+              href={`/${collection.slug}/${next.slug}`}
+              className="text-right hover:text-[color:var(--hc-primary)] hover:underline"
+            >
               {next.title} →
             </Link>
           )}
@@ -77,7 +83,10 @@ export default async function ArticlePage({
             <ul className="mt-3 space-y-2 text-sm">
               {headings.map((heading) => (
                 <li key={heading.id} className={heading.level === 3 ? 'pl-3' : ''}>
-                  <a href={`#${heading.id}`} className="text-neutral-600 hover:text-neutral-900">
+                  <a
+                    href={`#${heading.id}`}
+                    className="text-neutral-600 hover:text-[color:var(--hc-primary)]"
+                  >
                     {heading.text}
                   </a>
                 </li>

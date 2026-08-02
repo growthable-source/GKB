@@ -21,6 +21,13 @@ describe('can', () => {
     expect(can(staff, 'helpCenter.delete', { helpCenterId: 'h1' })).toBe(false)
   })
 
+  it('lets owners and staff create help centers but not editors or contributors', () => {
+    expect(can(owner, 'helpCenter.create', {})).toBe(true)
+    expect(can(staff, 'helpCenter.create', {})).toBe(true)
+    expect(can(editor, 'helpCenter.create', { helpCenterId: 'h1' })).toBe(false)
+    expect(can(contributor, 'helpCenter.create', { helpCenterId: 'h1' })).toBe(false)
+  })
+
   it('scopes editors to their own help center', () => {
     expect(can(editor, 'article.publish', { helpCenterId: 'h1' })).toBe(true)
     expect(can(editor, 'article.publish', { helpCenterId: 'h2' })).toBe(false)

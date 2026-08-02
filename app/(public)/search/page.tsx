@@ -26,7 +26,9 @@ export default async function SearchPage({
         {hits.map((hit) => (
           <li key={hit.articleId} className="py-4">
             <Link href={`/a/${hit.slug}`} className="group block">
-              <h2 className="font-medium group-hover:underline">{hit.title}</h2>
+              <h2 className="font-medium group-hover:text-[color:var(--hc-primary)] group-hover:underline">
+                {hit.title}
+              </h2>
               <p
                 className="mt-1 text-sm text-neutral-600"
                 // ts_headline over sanitized text; only <mark> is added.
