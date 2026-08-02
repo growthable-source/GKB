@@ -7,7 +7,12 @@
  * root 404s; the portal's sitemap lives under /support/). It lists ~2,800
  * article URLs whose slugs are descriptive enough to use as title-ish text
  * without visiting each page (e.g. .../articles/48000979915-where-do-survey-
- * answers-show-up -> "Where Do Survey Answers Show Up").
+ * answers-show-up -> "Where Do Survey Answers Show Up"). The fetch + slug-to-
+ * title helpers live in ./ghl.ts, shared with seed.mts's article-level match.
+ *
+ * This stage is topic-level and coarse (title strings only) — for an
+ * article-level coverage match with per-article judgment and original-article
+ * generation for real gaps, see seed.mts / `pnpm ops:seed`.
  *
  * Their list is chunked to keep each DeepSeek call to a sensible size; our
  * ~550 titles (grouped by collection) go in full on every chunk so the model
@@ -23,6 +28,7 @@ import { writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { ROOT, chat, parseJsonLoose, runPool, loadCheckpoint, saveCheckpoint } from './llm'
 import { pushSnapshot } from './snapshot'
+import { KNOWN_SITEMAP_URL, ROBOTS_URL, fetchTheirArticleUrls, titleFromSlug } from './ghl'
 import type { GapItem } from './types'
 
 const { serviceClient } = await import('../../lib/db/client')
@@ -32,53 +38,11 @@ const CHECKPOINT_STAGE = 'gap-chunks'
 const CHUNK_SIZE = 350
 const CONCURRENCY = 3
 
-const KNOWN_SITEMAP_URL = 'https://help.gohighlevel.com/support/sitemap.xml'
-const ROBOTS_URL = 'https://help.gohighlevel.com/robots.txt'
-const USER_AGENT = 'Mozilla/5.0 (compatible; GKB-content-ops/1.0)'
-const ARTICLE_PATH = '/support/solutions/articles/'
-
 const SYSTEM_PROMPT = `You compare a help center's article catalog against a competitor knowledge base's article list to find topics the competitor covers that we lack.
 Judge by whether a genuinely distinct topic is absent from our catalog, not by title-string matching — a rephrasing or synonym of something we already cover is NOT a gap.
 Reply with ONLY a JSON object, no markdown fences, no commentary:
 {"gaps":[{"topic":"<short topic name>","their_url":"<url>","suggested_collection":"<one of our collection names, or \\"Uncategorized\\">","priority":"high|medium|low"}]}
 Only include genuine gaps. If nothing in this chunk is a gap, reply {"gaps":[]}.`
-
-function titleFromSlug(url: string): string {
-  const last = url.split('/').filter(Boolean).pop() ?? ''
-  const withoutId = last.replace(/^\d+-/, '').replace(/-+$/, '')
-  const words = decodeURIComponent(withoutId)
-    .split('-')
-    .filter(Boolean)
-  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || last
-}
-
-async function fetchText(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } })
-    if (!res.ok) return null
-    return await res.text()
-  } catch {
-    return null
-  }
-}
-
-async function fetchTheirArticleUrls(): Promise<{ urls: string[]; sourceUrl: string } | null> {
-  let xml = await fetchText(KNOWN_SITEMAP_URL)
-  let sourceUrl = KNOWN_SITEMAP_URL
-  if (!xml) {
-    const robots = await fetchText(ROBOTS_URL)
-    const m = robots ? /^Sitemap:\s*(\S+)/im.exec(robots) : null
-    if (m) {
-      sourceUrl = m[1]
-      xml = await fetchText(sourceUrl)
-    }
-  }
-  if (!xml) return null
-  const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
-    .map((m) => m[1])
-    .filter((u) => u.includes(ARTICLE_PATH))
-  return { urls, sourceUrl }
-}
 
 function writeStubAndExit(reason: string): never {
   const outDir = path.join(ROOT, 'import/ops')

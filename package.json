@@ -15,6 +15,7 @@
     "db:types": "supabase gen types typescript --local > lib/db/types.ts",
     "ops:audit": "tsx scripts/content-ops/audit.mts",
     "ops:gap": "tsx scripts/content-ops/gap.mts",
+    "ops:seed": "tsx scripts/content-ops/seed.mts",
     "ops:rewrite": "tsx scripts/content-ops/rewrite.mts",
     "ops:report": "tsx scripts/content-ops/report.mts",
     "ops:push": "tsx scripts/content-ops/push.mts"

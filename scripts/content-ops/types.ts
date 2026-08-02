@@ -47,3 +47,15 @@ export type RewriteApplication =
   | { slug: string; held: true; note: string }
 
 export type RewriteApplications = Record<string, RewriteApplication>
+
+/** One entry in import/ops/seed-coverage.json: seed.mts phase 1's per-article coverage verdict. */
+export type SeedCoverageItem = {
+  url: string
+  titleish: string
+  /** Our slug that substantively covers this topic, or null if nothing does. */
+  coveredBy: string | null
+}
+
+/** One entry in import/ops/seed-manifest.json: provenance for an article seed.mts wrote. */
+export type SeedManifestEntry = { sourceUrl: string; seededAt: string }
+export type SeedManifest = Record<string, SeedManifestEntry>
