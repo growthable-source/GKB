@@ -61,8 +61,8 @@ const COVERAGE_CHUNK_SIZE = 100
 const COVERAGE_CONCURRENCY = 5
 const COVERAGE_CHECKPOINT_STAGE = 'seed-coverage-chunks'
 
-const FETCH_CONCURRENCY = 4
-const FETCH_DELAY_MS = 300
+const FETCH_CONCURRENCY = 2
+const FETCH_DELAY_MS = 900
 const FETCH_CHECKPOINT_STAGE = 'seed-fetch'
 const MIN_EXTRACTED_TEXT_LENGTH = 80
 
@@ -276,8 +276,16 @@ async function phase2FetchSources(missing: SeedCoverageItem[]): Promise<FetchedS
     if (isCached(item.url)) return
 
     try {
-      const res = await fetch(item.url, { headers: { 'User-Agent': USER_AGENT } })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      // Their portal rate-limits at scale; honor Retry-After on 429 rather
+      // than burning the article as a failure.
+      let res: Response | null = null
+      for (let attempt = 0; attempt < 5; attempt++) {
+        res = await fetch(item.url, { headers: { 'User-Agent': USER_AGENT } })
+        if (res.status !== 429) break
+        const retryAfter = Number(res.headers.get('retry-after'))
+        await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 30_000)
+      }
+      if (!res || !res.ok) throw new Error(`HTTP ${res?.status}`)
       const html = await res.text()
       const { title, text } = extractArticleContent(html)
       if (text.length < MIN_EXTRACTED_TEXT_LENGTH) {
