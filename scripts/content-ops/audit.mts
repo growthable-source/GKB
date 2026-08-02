@@ -18,6 +18,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { ROOT, chat, parseJsonLoose, runPool, loadCheckpoint, saveCheckpoint } from './llm'
+import { selectAll } from './db'
 import { summarizeAudit } from './summarize'
 import { pushSnapshot } from './snapshot'
 import type { AuditArticle, BrandLeak, Classification } from './types'
@@ -83,11 +84,15 @@ async function main() {
   if (collectionsError) throw new Error(`collections query failed: ${collectionsError.message}`)
   const collectionTitleById = new Map((collections ?? []).map((c) => [c.id, c.title]))
 
-  const { data: articles, error: articlesError } = await db
-    .from('articles')
-    .select('id, slug, title, body_html, collection_id, updated_at')
-    .eq('status', 'published')
-  if (articlesError) throw new Error(`articles query failed: ${articlesError.message}`)
+  const articles = await selectAll(
+    () =>
+      db
+        .from('articles')
+        .select('id, slug, title, body_html, collection_id, updated_at')
+        .eq('status', 'published')
+        .order('id'),
+    'articles',
+  )
 
   console.log(`${articles?.length ?? 0} published articles loaded`)
 

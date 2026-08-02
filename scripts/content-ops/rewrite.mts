@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { ROOT, chat, runPool, loadCheckpoint, saveCheckpoint } from './llm'
+import { selectAll } from './db'
 import { pushSnapshot } from './snapshot'
 import type { AuditArticle, RewriteIndexEntry } from './types'
 
@@ -67,15 +68,19 @@ async function main() {
 
   const { serviceClient } = await import('../../lib/db/client')
   const db = serviceClient()
-  const { data: rows, error } = await db
-    .from('articles')
-    .select('id, slug, title, body_html, body_json, collection_id')
-    .in(
-      'id',
-      queue.map((a) => a.id),
-    )
-  if (error) throw new Error(`articles query failed: ${error.message}`)
-  const bySourceId = new Map((rows ?? []).map((r) => [r.id, r]))
+  const rows = await selectAll(
+    () =>
+      db
+        .from('articles')
+        .select('id, slug, title, body_html, body_json, collection_id')
+        .in(
+          'id',
+          queue.map((a) => a.id),
+        )
+        .order('id'),
+    'articles',
+  )
+  const bySourceId = new Map(rows.map((r) => [r.id, r]))
 
   if (DRY) {
     console.log(`[dry-run] would send ${queue.length} rewrite requests to DeepSeek`)

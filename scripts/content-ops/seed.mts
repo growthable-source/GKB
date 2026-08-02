@@ -41,6 +41,7 @@ import { createHash } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
 import path from 'node:path'
 import { ROOT, chat, parseJsonLoose, runPool, loadCheckpoint, saveCheckpoint } from './llm'
+import { selectAll } from './db'
 import {
   KNOWN_SITEMAP_URL,
   ROBOTS_URL,
@@ -162,11 +163,10 @@ function buildCatalogText(collections: { id: string; title: string }[], articles
 async function phase1CoverageMatch(db: ReturnType<typeof serviceClient>): Promise<SeedCoverageItem[]> {
   const { data: collections, error: collectionsError } = await db.from('collections').select('id, title')
   if (collectionsError) throw new Error(`collections query failed: ${collectionsError.message}`)
-  const { data: articleRows, error: articlesError } = await db
-    .from('articles')
-    .select('slug, title, collection_id')
-    .eq('status', 'published')
-  if (articlesError) throw new Error(`articles query failed: ${articlesError.message}`)
+  const articleRows = await selectAll(
+    () => db.from('articles').select('slug, title, collection_id').eq('status', 'published').order('id'),
+    'articles',
+  )
 
   const articles: OurArticle[] = (articleRows ?? []).map((a) => ({
     slug: a.slug,
@@ -346,9 +346,8 @@ async function phase3GenerateAndInsert(
     throw new Error(`no "${FALLBACK_COLLECTION_TITLE}" collection found to use as the unknown-collection fallback`)
   }
 
-  const { data: existingArticles, error: articlesError } = await db.from('articles').select('slug')
-  if (articlesError) throw new Error(`articles query failed: ${articlesError.message}`)
-  const articleSlugs = (existingArticles ?? []).map((a) => a.slug)
+  const existingArticles = await selectAll(() => db.from('articles').select('slug').order('id'), 'articles')
+  const articleSlugs = existingArticles.map((a) => a.slug)
 
   const { data: centerRows, error: centersError } = await db
     .from('help_centers')

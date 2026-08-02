@@ -40,6 +40,7 @@ const { serviceClient } = await import('../lib/db/client')
 const { sanitizeArticleHtml } = await import('../lib/content/html')
 const { slugify, uniqueSlug } = await import('../lib/content/slug')
 const { indexArticle } = await import('../lib/search/index-article')
+const { selectAll } = await import('./content-ops/db')
 
 const DRY = process.argv.includes('--dry-run')
 const limitArg = process.argv.indexOf('--limit')
@@ -154,8 +155,8 @@ async function main() {
   const collectionIdByTitle = new Map(
     (existingCollections ?? []).map((c) => [c.title, c.id]),
   )
-  const { data: existingArticles } = await db.from('articles').select('slug')
-  const articleSlugs = (existingArticles ?? []).map((a) => a.slug)
+  const existingArticles = await selectAll(() => db.from('articles').select('slug').order('id'), 'articles')
+  const articleSlugs = existingArticles.map((a) => a.slug)
 
   let done = 0
   let skipped = 0

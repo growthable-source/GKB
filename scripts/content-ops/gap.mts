@@ -27,6 +27,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { ROOT, chat, parseJsonLoose, runPool, loadCheckpoint, saveCheckpoint } from './llm'
+import { selectAll } from './db'
 import { pushSnapshot } from './snapshot'
 import { KNOWN_SITEMAP_URL, ROBOTS_URL, fetchTheirArticleUrls, titleFromSlug } from './ghl'
 import type { GapItem } from './types'
@@ -73,11 +74,10 @@ async function main() {
   const db = serviceClient()
   const { data: collections, error: collectionsError } = await db.from('collections').select('id, title')
   if (collectionsError) throw new Error(`collections query failed: ${collectionsError.message}`)
-  const { data: articles, error: articlesError } = await db
-    .from('articles')
-    .select('title, collection_id')
-    .eq('status', 'published')
-  if (articlesError) throw new Error(`articles query failed: ${articlesError.message}`)
+  const articles = await selectAll(
+    () => db.from('articles').select('title, collection_id').eq('status', 'published').order('id'),
+    'articles',
+  )
 
   const collectionTitleById = new Map((collections ?? []).map((c) => [c.id, c.title]))
   const ourCollectionNames = [...(collections ?? []).map((c) => c.title), 'Uncategorized']
