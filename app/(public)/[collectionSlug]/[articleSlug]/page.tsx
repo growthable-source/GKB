@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getActiveHelpCenter } from '@/lib/tenancy/active'
+import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import {
   getEffectiveArticle,
   listEffectiveArticles,
@@ -14,16 +14,16 @@ export default async function ArticlePage({
   params: Promise<{ collectionSlug: string; articleSlug: string }>
 }) {
   const { collectionSlug, articleSlug } = await params
-  const helpCenter = await getActiveHelpCenter()
+  const baseId = await getBaseHelpCenterId()
 
-  const article = await getEffectiveArticle(helpCenter.id, articleSlug)
+  const article = await getEffectiveArticle(baseId, articleSlug)
   if (!article) notFound()
 
-  const collections = await listEffectiveCollections(helpCenter.id)
+  const collections = await listEffectiveCollections(baseId)
   const collection = collections.find((c) => c.id === article.collectionId)
   if (!collection || collection.slug !== collectionSlug) notFound()
 
-  const siblings = await listEffectiveArticles(helpCenter.id, collection.id)
+  const siblings = await listEffectiveArticles(baseId, collection.id)
   const index = siblings.findIndex((s) => s.id === article.id)
   const previous = index > 0 ? siblings[index - 1] : null
   const next = index >= 0 && index < siblings.length - 1 ? siblings[index + 1] : null

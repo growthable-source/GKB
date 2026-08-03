@@ -123,3 +123,29 @@ export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => 
 
   return toActiveHelpCenter(data)
 })
+
+/**
+ * The base help center's id — the single owner of all shared content.
+ *
+ * Help centers are brand skins, not content forks: every collection and
+ * article lives once, in the base center's placement and search rows. A
+ * non-base center differs only in name/colors/logo/favicon/domain — it has
+ * no placement or search rows of its own. `getActiveHelpCenter()` resolves
+ * BRAND from the request's Host header (which center's colors/logo/name to
+ * render); `getBaseHelpCenterId()` resolves the single CONTENT owner (what
+ * every brand reads through). These are deliberately different concepts —
+ * content-fetching and content-writing code must always use this, never
+ * `getActiveHelpCenter().id`, or a non-base brand will silently show empty
+ * or diverged content.
+ */
+export const getBaseHelpCenterId = cache(async (): Promise<string> => {
+  const { data, error } = await serviceClient()
+    .from('help_centers')
+    .select('id')
+    .eq('is_base', true)
+    .single()
+  if (error || !data) {
+    throw new Error(`No base help center found: ${error?.message ?? 'missing row'}`)
+  }
+  return data.id
+})

@@ -1,12 +1,21 @@
 import Link from 'next/link'
 import { serviceClient } from '@/lib/db/client'
+import { selectAll } from '@/lib/db/select-all'
 import { createArticle } from './actions'
 
 export default async function ArticlesPage() {
-  const { data: articles } = await serviceClient()
-    .from('articles')
-    .select('id, title, slug, status, updated_at')
-    .order('updated_at', { ascending: false })
+  const articles = await selectAll(
+    () =>
+      serviceClient()
+        .from('articles')
+        .select('id, title, slug, status, updated_at')
+        // updated_at alone isn't guaranteed unique (ties are possible), and
+        // stable .range() pagination needs a fully-unique order — id (the PK)
+        // breaks ties deterministically.
+        .order('updated_at', { ascending: false })
+        .order('id', { ascending: true }),
+    'articles',
+  )
 
   return (
     <div className="flex flex-col gap-8">

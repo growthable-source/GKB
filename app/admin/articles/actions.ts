@@ -3,22 +3,27 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { serviceClient } from '@/lib/db/client'
+import { selectAll } from '@/lib/db/select-all'
 import { authorize } from '@/lib/authz/authorize'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/content/html'
 import { slugify, uniqueSlug } from '@/lib/content/slug'
-import { getActiveHelpCenter } from '@/lib/tenancy/active'
+import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { reindexArticleEverywhere } from '@/lib/search/index-article'
 import type { Json } from '@/lib/db/types'
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }
 
 export async function createArticle(): Promise<void> {
-  const helpCenter = await getActiveHelpCenter()
-  const actor = await authorize('article.create', { helpCenterId: helpCenter.id })
+  const actor = await authorize('article.create', { helpCenterId: await getBaseHelpCenterId() })
   const db = serviceClient()
 
-  const { data: existing } = await db.from('articles').select('slug')
-  const slug = uniqueSlug('untitled', (existing ?? []).map((r) => r.slug))
+  const existing = await selectAll(
+    // .order('id') gives stable, unique-key .range() pagination — see
+    // lib/db/select-all.ts.
+    () => db.from('articles').select('slug').order('id'),
+    'articles slugs',
+  )
+  const slug = uniqueSlug('untitled', existing.map((r) => r.slug))
 
   const { data: article, error } = await db
     .from('articles')
@@ -46,8 +51,7 @@ export async function saveArticle(input: {
   bodyJson: Record<string, unknown>
   bodyHtml: string
 }): Promise<void> {
-  const helpCenter = await getActiveHelpCenter()
-  await authorize('article.update', { helpCenterId: helpCenter.id })
+  await authorize('article.update', { helpCenterId: await getBaseHelpCenterId() })
 
   const title = input.title.trim() || 'Untitled'
   const bodyHtml = sanitizeArticleHtml(input.bodyHtml)
@@ -75,8 +79,8 @@ export async function saveArticle(input: {
 }
 
 export async function publishArticle(articleId: string): Promise<void> {
-  const helpCenter = await getActiveHelpCenter()
-  await authorize('article.publish', { helpCenterId: helpCenter.id })
+  const baseId = await getBaseHelpCenterId()
+  await authorize('article.publish', { helpCenterId: baseId })
   const db = serviceClient()
 
   const { data: article, error: readError } = await db
@@ -90,8 +94,11 @@ export async function publishArticle(articleId: string): Promise<void> {
   // Replace the placeholder slug with one derived from the final title.
   let slug = article.slug
   if (slug.startsWith('untitled')) {
-    const { data: existing } = await db.from('articles').select('slug').neq('id', articleId)
-    slug = uniqueSlug(slugify(article.title), (existing ?? []).map((r) => r.slug))
+    const existing = await selectAll(
+      () => db.from('articles').select('slug').neq('id', articleId).order('id'),
+      'articles slugs',
+    )
+    slug = uniqueSlug(slugify(article.title), existing.map((r) => r.slug))
   }
 
   const { error } = await db
@@ -101,57 +108,25 @@ export async function publishArticle(articleId: string): Promise<void> {
 
   if (error) throw new Error(`Could not publish article: ${error.message}`)
 
-  // Phase 1 publishes into the active help center. Phase 2 replaces this with
-  // the distribution picker from lib/distribution.
+  // Content is shared across every branded help center — publishing places
+  // the article once, into the base center's structure, which every brand
+  // reads through (see lib/tenancy/active.ts's getBaseHelpCenterId). There is
+  // no per-center propagation: a non-base center never has placement rows of
+  // its own.
   const { count } = await db
     .from('help_center_articles')
     .select('*', { count: 'exact', head: true })
-    .eq('help_center_id', helpCenter.id)
+    .eq('help_center_id', baseId)
 
   const { error: placementError } = await db.from('help_center_articles').upsert(
-    { help_center_id: helpCenter.id, article_id: articleId, position: count ?? 0 },
+    { help_center_id: baseId, article_id: articleId, position: count ?? 0 },
     { onConflict: 'help_center_id,article_id', ignoreDuplicates: true },
   )
 
   if (placementError) throw new Error(`Could not place article: ${placementError.message}`)
 
-  // New articles auto-propagate to every other center that opted in, so a
-  // clone stays current without an editor visiting each admin separately.
-  const { data: autoIncludeCenters, error: autoIncludeError } = await db
-    .from('help_centers')
-    .select('id')
-    .eq('auto_include_new_articles', true)
-    .neq('id', helpCenter.id)
-  if (autoIncludeError) {
-    throw new Error(`Could not read auto-include help centers: ${autoIncludeError.message}`)
-  }
-
-  for (const center of autoIncludeCenters ?? []) {
-    // The primary center's publish already committed above — a hiccup
-    // placing this article in one auto-include center must not surface as a
-    // failure of the publish the editor just asked for, and must not stop
-    // the remaining centers (or the reindex/revalidate below) from running.
-    try {
-      const { count: centerCount } = await db
-        .from('help_center_articles')
-        .select('*', { count: 'exact', head: true })
-        .eq('help_center_id', center.id)
-
-      const { error: autoPlacementError } = await db.from('help_center_articles').upsert(
-        { help_center_id: center.id, article_id: articleId, position: centerCount ?? 0 },
-        { onConflict: 'help_center_id,article_id', ignoreDuplicates: true },
-      )
-      if (autoPlacementError) {
-        throw new Error(`Could not place article in ${center.id}: ${autoPlacementError.message}`)
-      }
-    } catch (error) {
-      console.error(`publishArticle: auto-include propagation to ${center.id} failed`, error)
-    }
-  }
-
-  // Publishing flips the status every placement reads, so reindex every help
-  // center that places the article — this also covers the placements just
-  // added above, since reindexArticleEverywhere re-reads them from the db.
+  // Publishing flips the status every brand reads through this placement, so
+  // reindex it.
   await reindexArticleEverywhere(articleId)
   revalidatePath('/admin/articles')
   revalidatePath('/', 'layout')

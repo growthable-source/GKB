@@ -3,6 +3,21 @@
 **Date:** 2026-07-31
 **Status:** Approved
 
+> **Architecture correction (2026-08-03):** help centers share ONE canonical
+> content pool — the base center's `help_center_collections` /
+> `help_center_articles` / `article_search` rows. A non-base center has NO
+> placement or search rows of its own; it differs only in branding (name,
+> colors, logo, favicon, domain). Content reads and writes always resolve to
+> the base center's id via `getBaseHelpCenterId()` in `lib/tenancy/active.ts`
+> — never to `getActiveHelpCenter().id` (which resolves brand from the
+> request's Host header, a different concept). Creating a help center never
+> copies content, only inserts a branding row (`lib/tenancy/create-center.ts`).
+> The per-row override columns described below (`title_override`,
+> `is_hidden`, etc.) still exist in the schema for POSSIBLE future per-brand
+> customization, but no code path writes them today — do not reintroduce
+> per-center content copying when reading the "Clone and rebrand" language
+> further down; that phrasing predates this correction.
+
 ## Purpose
 
 A multi-tenant, Intercom-style knowledge base platform. One canonical content library feeds many

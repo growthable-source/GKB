@@ -7,7 +7,7 @@ import type { BodyJson, CanonicalArticle, EffectiveArticle } from '@/lib/content
  * placement is hidden or the article is not published, so callers delete the row.
  */
 export async function getEffectiveArticleForIndexing(
-  helpCenterId: string,
+  baseHelpCenterId: string,
   articleId: string,
 ): Promise<EffectiveArticle | null> {
   const { data, error } = await serviceClient()
@@ -18,7 +18,7 @@ export async function getEffectiveArticleForIndexing(
        articles!inner (id, slug, title, excerpt, body_json, body_html,
                        collection_id, status, published_at)`,
     )
-    .eq('help_center_id', helpCenterId)
+    .eq('help_center_id', baseHelpCenterId)
     .eq('article_id', articleId)
     .maybeSingle()
 

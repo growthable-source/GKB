@@ -23,9 +23,11 @@
  *     ORIGINAL article grounded in the fetched source (never GoHighLevel's
  *     wording — see the system prompt), then inserts it the way
  *     scripts/import-drive.mts does: sanitize, generate TipTap body_json, a
- *     unique slug, publish, and place in every help center that is the base
- *     center or has auto_include_new_articles = true. Provenance is
- *     recorded in import/ops/seed-manifest.json.
+ *     unique slug, publish, and place once into the base center's structure
+ *     — every branded help center reads through it automatically (see
+ *     lib/tenancy/active.ts's getBaseHelpCenterId), so there is nothing to
+ *     propagate to other centers. Provenance is recorded in
+ *     import/ops/seed-manifest.json.
  *
  * --limit N caps how many missing articles phases 2-3 fetch/generate/insert
  * in one run (phase 1's match always covers the whole gap, since it's the
@@ -349,22 +351,20 @@ async function phase3GenerateAndInsert(
   const existingArticles = await selectAll(() => db.from('articles').select('slug').order('id'), 'articles')
   const articleSlugs = existingArticles.map((a) => a.slug)
 
-  const { data: centerRows, error: centersError } = await db
+  const { data: baseCenter, error: centersError } = await db
     .from('help_centers')
-    .select('id, slug, is_base, auto_include_new_articles')
-  if (centersError) throw new Error(`help_centers query failed: ${centersError.message}`)
-  const seedCenters = (centerRows ?? []).filter((c) => c.is_base || c.auto_include_new_articles)
-  const baseCenter = seedCenters.find((c) => c.is_base)
-  if (!baseCenter) throw new Error('no base help center (is_base = true) found')
-
-  const positionByCenter = new Map<string, number>()
-  for (const center of seedCenters) {
-    const { count } = await db
-      .from('help_center_articles')
-      .select('*', { count: 'exact', head: true })
-      .eq('help_center_id', center.id)
-    positionByCenter.set(center.id, count ?? 0)
+    .select('id, slug')
+    .eq('is_base', true)
+    .single()
+  if (centersError || !baseCenter) {
+    throw new Error(`no base help center (is_base = true) found: ${centersError?.message ?? 'missing row'}`)
   }
+
+  const { count: baseArticleCount } = await db
+    .from('help_center_articles')
+    .select('*', { count: 'exact', head: true })
+    .eq('help_center_id', baseCenter.id)
+  let position = baseArticleCount ?? 0
 
   const { sanitizeArticleHtml, htmlToText } = await import('../../lib/content/html')
   const { slugify, uniqueSlug } = await import('../../lib/content/slug')
@@ -450,15 +450,11 @@ async function phase3GenerateAndInsert(
         .single()
       if (insertError || !article) throw new Error(`article insert failed: ${insertError?.message}`)
 
-      for (const center of seedCenters) {
-        const position = positionByCenter.get(center.id) ?? 0
-        positionByCenter.set(center.id, position + 1)
-        const { error: placementError } = await db
-          .from('help_center_articles')
-          .insert({ help_center_id: center.id, article_id: article.id, position })
-        if (placementError) throw new Error(`placement into ${center.slug} failed: ${placementError.message}`)
-        await indexArticle(center.id, article.id)
-      }
+      const { error: placementError } = await db
+        .from('help_center_articles')
+        .insert({ help_center_id: baseCenter.id, article_id: article.id, position: position++ })
+      if (placementError) throw new Error(`placement into base failed: ${placementError.message}`)
+      await indexArticle(baseCenter.id, article.id)
 
       genCheckpoint[source.url] = { id: article.id, slug, sourceUrl: source.url }
       manifest[slug] = { sourceUrl: source.url, seededAt: new Date().toISOString() }

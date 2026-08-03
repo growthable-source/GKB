@@ -1,12 +1,13 @@
 import Link from 'next/link'
-import { getActiveHelpCenter } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { countArticlesPerCollection, listEffectiveCollections } from '@/lib/content/queries'
 import { SearchBox } from '@/components/public/search-box'
 
 export default async function HomePage() {
   const helpCenter = await getActiveHelpCenter()
-  const collections = await listEffectiveCollections(helpCenter.id)
-  const counts = await countArticlesPerCollection(helpCenter.id)
+  const baseId = await getBaseHelpCenterId()
+  const collections = await listEffectiveCollections(baseId)
+  const counts = await countArticlesPerCollection(baseId)
 
   return (
     <>

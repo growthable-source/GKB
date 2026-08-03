@@ -1,5 +1,6 @@
 import { serviceClient } from '@/lib/db/client'
 import { CreateCenterForm } from '@/components/admin/create-center-form'
+import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { safeHex, DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 import { createHelpCenter } from './actions'
 
@@ -18,17 +19,16 @@ export default async function CentersPage({
     .order('name', { ascending: true })
   if (error) throw new Error(`Could not load help centers: ${error.message}`)
 
-  // One query for every placement row; counted per center in JS, same
-  // approach as countArticlesPerCollection.
-  const { data: placements, error: placementsError } = await db
+  // Every center renders the same shared content (see
+  // lib/tenancy/active.ts's getBaseHelpCenterId) — one count-only query
+  // (head: true returns no rows, so this never truncates as the catalog
+  // grows) against the base center's structure applies to all of them.
+  const baseId = await getBaseHelpCenterId()
+  const { count: sharedArticleCount, error: countError } = await db
     .from('help_center_articles')
-    .select('help_center_id')
-  if (placementsError) throw new Error(`Could not load article counts: ${placementsError.message}`)
-
-  const articleCounts = new Map<string, number>()
-  for (const row of placements ?? []) {
-    articleCounts.set(row.help_center_id, (articleCounts.get(row.help_center_id) ?? 0) + 1)
-  }
+    .select('*', { count: 'exact', head: true })
+    .eq('help_center_id', baseId)
+  if (countError) throw new Error(`Could not count shared articles: ${countError.message}`)
 
   const tenantDomain = process.env.NEXT_PUBLIC_TENANT_DOMAIN
 
@@ -101,7 +101,7 @@ export default async function CentersPage({
               </div>
             </div>
             <span className="text-sm text-neutral-500">
-              {articleCounts.get(center.id) ?? 0} articles
+              {sharedArticleCount ?? 0} shared articles
             </span>
           </li>
         ))}

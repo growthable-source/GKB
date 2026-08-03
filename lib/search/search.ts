@@ -10,7 +10,7 @@ export type SearchHit = {
 }
 
 export async function searchHelpCenter(
-  helpCenterId: string,
+  baseHelpCenterId: string,
   query: string,
   limit = 20,
 ): Promise<SearchHit[]> {
@@ -18,7 +18,7 @@ export async function searchHelpCenter(
   if (!trimmed) return []
 
   const { data, error } = await serviceClient().rpc('search_help_center', {
-    p_help_center_id: helpCenterId,
+    p_help_center_id: baseHelpCenterId,
     p_query: trimmed,
     p_limit: limit,
   })

@@ -1,4 +1,5 @@
 import { serviceClient } from '@/lib/db/client'
+import { selectAll } from '@/lib/db/select-all'
 import { mergeArticle, mergeCollection } from './merge'
 import type {
   ArticlePlacement,
@@ -88,27 +89,33 @@ function toCollectionPlacement(row: CollectionPlacementRow): CollectionPlacement
 
 /** Visible, public-audience collections for a help center, in display order. */
 export async function listEffectiveCollections(
-  helpCenterId: string,
+  baseHelpCenterId: string,
 ): Promise<EffectiveCollection[]> {
-  const { data, error } = await serviceClient()
-    .from('help_center_collections')
-    .select(
-      `help_center_id, collection_id, position, is_hidden, title_override,
-       description_override, audience,
-       collections!inner (${COLLECTION_FIELDS})`,
-    )
-    .eq('help_center_id', helpCenterId)
-    .eq('is_hidden', false)
-    // Audience is a placement-level column with no canonical counterpart, so
-    // filtering the raw column here IS filtering the effective value. Article
-    // pages resolve their collection through this list, so gating collections
-    // gates articles too.
-    .eq('audience', 'public')
-    .order('position', { ascending: true })
+  const data = await selectAll(
+    () =>
+      serviceClient()
+        .from('help_center_collections')
+        .select(
+          `help_center_id, collection_id, position, is_hidden, title_override,
+           description_override, audience,
+           collections!inner (${COLLECTION_FIELDS})`,
+        )
+        .eq('help_center_id', baseHelpCenterId)
+        .eq('is_hidden', false)
+        // Audience is a placement-level column with no canonical counterpart, so
+        // filtering the raw column here IS filtering the effective value. Article
+        // pages resolve their collection through this list, so gating collections
+        // gates articles too.
+        .eq('audience', 'public')
+        // Pagination via .range() needs a stable, fully-unique order — ties on
+        // position alone would let consecutive page reads skip or duplicate
+        // rows. collection_id is unique per help_center_id (composite PK).
+        .order('position', { ascending: true })
+        .order('collection_id', { ascending: true }),
+    'listEffectiveCollections',
+  )
 
-  if (error) throw new Error(`listEffectiveCollections failed: ${error.message}`)
-
-  return (data ?? []).map((row) => {
+  return data.map((row) => {
     const canonical = row.collections as unknown as CanonicalCollection
     return mergeCollection(canonical, toCollectionPlacement(row as CollectionPlacementRow))
   })
@@ -116,24 +123,29 @@ export async function listEffectiveCollections(
 
 /** Visible, published articles in a collection, in display order. */
 export async function listEffectiveArticles(
-  helpCenterId: string,
+  baseHelpCenterId: string,
   collectionId: string,
 ): Promise<EffectiveArticle[]> {
-  const { data, error } = await serviceClient()
-    .from('help_center_articles')
-    .select(
-      `help_center_id, article_id, position, is_hidden, title_override,
-       body_json_override, body_html_override, collection_override_id,
-       articles!inner (${ARTICLE_FIELDS})`,
-    )
-    .eq('help_center_id', helpCenterId)
-    .eq('is_hidden', false)
-    .eq('articles.status', 'published')
-    .order('position', { ascending: true })
+  const data = await selectAll(
+    () =>
+      serviceClient()
+        .from('help_center_articles')
+        .select(
+          `help_center_id, article_id, position, is_hidden, title_override,
+           body_json_override, body_html_override, collection_override_id,
+           articles!inner (${ARTICLE_FIELDS})`,
+        )
+        .eq('help_center_id', baseHelpCenterId)
+        .eq('is_hidden', false)
+        .eq('articles.status', 'published')
+        // See the ordering note in listEffectiveCollections above. article_id
+        // is unique per help_center_id (composite PK).
+        .order('position', { ascending: true })
+        .order('article_id', { ascending: true }),
+    'listEffectiveArticles',
+  )
 
-  if (error) throw new Error(`listEffectiveArticles failed: ${error.message}`)
-
-  return (data ?? [])
+  return data
     .map((row) =>
       mergeArticle(
         toCanonicalArticle(row.articles as unknown as ArticleRow),
@@ -146,7 +158,7 @@ export async function listEffectiveArticles(
 
 /** One published, visible article by slug, or null. */
 export async function getEffectiveArticle(
-  helpCenterId: string,
+  baseHelpCenterId: string,
   articleSlug: string,
 ): Promise<EffectiveArticle | null> {
   const { data, error } = await serviceClient()
@@ -156,7 +168,7 @@ export async function getEffectiveArticle(
        body_json_override, body_html_override, collection_override_id,
        articles!inner (${ARTICLE_FIELDS})`,
     )
-    .eq('help_center_id', helpCenterId)
+    .eq('help_center_id', baseHelpCenterId)
     .eq('is_hidden', false)
     .eq('articles.slug', articleSlug)
     .eq('articles.status', 'published')
@@ -183,20 +195,26 @@ type ArticleCountRow = {
  * article's full body once per collection.
  */
 export async function countArticlesPerCollection(
-  helpCenterId: string,
+  baseHelpCenterId: string,
 ): Promise<Map<string, number>> {
-  const { data, error } = await serviceClient()
-    .from('help_center_articles')
-    .select('collection_override_id, articles!inner (collection_id)')
-    .eq('help_center_id', helpCenterId)
-    .eq('is_hidden', false)
-    .eq('articles.status', 'published')
-
-  if (error) throw new Error(`countArticlesPerCollection failed: ${error.message}`)
+  const data = await selectAll(
+    () =>
+      serviceClient()
+        .from('help_center_articles')
+        .select('collection_override_id, articles!inner (collection_id)')
+        .eq('help_center_id', baseHelpCenterId)
+        .eq('is_hidden', false)
+        .eq('articles.status', 'published')
+        // Order needed for stable .range() pagination (see the note in
+        // listEffectiveCollections); display order doesn't matter here since
+        // rows are only counted, not shown.
+        .order('article_id', { ascending: true }),
+    'countArticlesPerCollection',
+  )
 
   const counts = new Map<string, number>()
 
-  for (const row of (data ?? []) as ArticleCountRow[]) {
+  for (const row of data as ArticleCountRow[]) {
     const canonical = Array.isArray(row.articles) ? row.articles[0] : row.articles
     const collectionId = row.collection_override_id ?? canonical?.collection_id ?? null
     if (!collectionId) continue

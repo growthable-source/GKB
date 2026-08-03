@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { ArticleEditor } from '@/components/editor/article-editor'
 import { serviceClient } from '@/lib/db/client'
-import { getActiveHelpCenter } from '@/lib/tenancy/active'
+import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { listEffectiveCollections } from '@/lib/content/queries'
 import { publishArticle, saveArticle } from '../actions'
 
@@ -11,7 +11,7 @@ export default async function ArticleEditorPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const helpCenter = await getActiveHelpCenter()
+  const baseId = await getBaseHelpCenterId()
 
   const { data: article } = await serviceClient()
     .from('articles')
@@ -21,7 +21,7 @@ export default async function ArticleEditorPage({
 
   if (!article) notFound()
 
-  const collections = await listEffectiveCollections(helpCenter.id)
+  const collections = await listEffectiveCollections(baseId)
 
   return (
     <ArticleEditor

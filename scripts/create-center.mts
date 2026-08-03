@@ -1,6 +1,8 @@
 /**
- * Thin CLI over cloneHelpCenter: creates a new help center by copying the
- * base center's collection/article placements and search index.
+ * Thin CLI over createBrandedHelpCenter: creates a new BRANDED help center.
+ * It has no content of its own — every center reads the same shared
+ * collections/articles through the base center (see
+ * lib/tenancy/active.ts's getBaseHelpCenterId).
  *
  * Run: pnpm tsx scripts/create-center.mts --name "Acme Support" --slug acme \
  *        --primary "#7C3AED" --secondary "#64748B" \
@@ -23,7 +25,7 @@ loadEnv(path.join(ROOT, '.env.cloud'))
 loadEnv(path.join(ROOT, '.env.local'))
 
 // Import lib code after env is set; serviceClient reads env at call time.
-const { cloneHelpCenter } = await import('../lib/tenancy/clone')
+const { createBrandedHelpCenter } = await import('../lib/tenancy/create-center')
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)
@@ -46,7 +48,7 @@ if (!name || !slug || !primary || !secondary) {
 }
 
 async function main() {
-  const created = await cloneHelpCenter({
+  const created = await createBrandedHelpCenter({
     name: name!,
     slug: slug!,
     primaryHex: primary!,

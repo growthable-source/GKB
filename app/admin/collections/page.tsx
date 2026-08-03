@@ -1,10 +1,10 @@
 import { listEffectiveCollections } from '@/lib/content/queries'
-import { getActiveHelpCenter } from '@/lib/tenancy/active'
+import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { createCollection, deleteCollection } from './actions'
 
 export default async function CollectionsPage() {
-  const helpCenter = await getActiveHelpCenter()
-  const collections = await listEffectiveCollections(helpCenter.id)
+  const baseId = await getBaseHelpCenterId()
+  const collections = await listEffectiveCollections(baseId)
 
   return (
     <div className="flex flex-col gap-8">

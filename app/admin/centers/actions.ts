@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { authorize } from '@/lib/authz/authorize'
-import { cloneHelpCenter } from '@/lib/tenancy/clone'
+import { createBrandedHelpCenter } from '@/lib/tenancy/create-center'
 import { DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 
 export type CreateHelpCenterState = { error?: string }
@@ -29,7 +29,7 @@ export async function createHelpCenter(
 
   let created
   try {
-    created = await cloneHelpCenter({
+    created = await createBrandedHelpCenter({
       name,
       slug,
       primaryHex,

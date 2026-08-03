@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getActiveHelpCenter } from '@/lib/tenancy/active'
+import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { listEffectiveArticles, listEffectiveCollections } from '@/lib/content/queries'
 
 export default async function CollectionPage({
@@ -9,13 +9,13 @@ export default async function CollectionPage({
   params: Promise<{ collectionSlug: string }>
 }) {
   const { collectionSlug } = await params
-  const helpCenter = await getActiveHelpCenter()
+  const baseId = await getBaseHelpCenterId()
 
-  const collections = await listEffectiveCollections(helpCenter.id)
+  const collections = await listEffectiveCollections(baseId)
   const collection = collections.find((c) => c.slug === collectionSlug)
   if (!collection) notFound()
 
-  const articles = await listEffectiveArticles(helpCenter.id, collection.id)
+  const articles = await listEffectiveArticles(baseId, collection.id)
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">
