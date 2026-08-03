@@ -13,12 +13,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* No page in this app has a dark-mode design (no `dark:` variants anywhere —
+   every page hardcodes a light Tailwind background). A prefers-color-scheme
+   override here would lighten inherited text against those light
+   backgrounds, so --foreground/--background stay fixed regardless of the
+   viewer's OS theme. */
 
 body {
   background: var(--background);
