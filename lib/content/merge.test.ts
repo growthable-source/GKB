@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mergeArticle, mergeCollection } from './merge'
+import { mergeArticle, mergeArticleSummary, mergeCollection } from './merge'
 import type {
   ArticlePlacement,
   CanonicalArticle,
+  CanonicalArticleSummary,
   CanonicalCollection,
   CollectionPlacement,
 } from './types'
@@ -29,6 +30,55 @@ const placement: ArticlePlacement = {
   bodyHtmlOverride: null,
   collectionOverrideId: null,
 }
+
+describe('mergeArticleSummary', () => {
+  const summary: CanonicalArticleSummary = {
+    id: 'a1',
+    slug: 'cancel-subscription',
+    title: 'Cancel your subscription',
+    excerpt: 'How to cancel.',
+    collectionId: 'c1',
+    status: 'published',
+    publishedAt: '2026-07-01T00:00:00Z',
+  }
+  const summaryPlacement = {
+    position: 3,
+    isHidden: false,
+    titleOverride: null,
+    collectionOverrideId: null,
+  }
+
+  it('applies the same title precedence as mergeArticle', () => {
+    expect(mergeArticleSummary(summary, summaryPlacement).title).toBe('Cancel your subscription')
+    expect(
+      mergeArticleSummary(summary, { ...summaryPlacement, titleOverride: 'Stop billing' }).title,
+    ).toBe('Stop billing')
+    // Blank overrides mean "inherit", never "blank it out".
+    expect(mergeArticleSummary(summary, { ...summaryPlacement, titleOverride: '  ' }).title).toBe(
+      'Cancel your subscription',
+    )
+  })
+
+  it('resolves the effective collection the same way mergeArticle does', () => {
+    expect(mergeArticleSummary(summary, summaryPlacement).collectionId).toBe('c1')
+    expect(
+      mergeArticleSummary(summary, { ...summaryPlacement, collectionOverrideId: 'c2' })
+        .collectionId,
+    ).toBe('c2')
+  })
+
+  it('agrees with mergeArticle on every field they share', () => {
+    const override = { titleOverride: 'Stop billing', collectionOverrideId: 'c2' }
+    const full = mergeArticle(canonical, { ...placement, ...override, position: 3 })
+    const slim = mergeArticleSummary(summary, { ...summaryPlacement, ...override })
+
+    expect(slim.title).toBe(full.title)
+    expect(slim.collectionId).toBe(full.collectionId)
+    expect(slim.position).toBe(full.position)
+    expect(slim.excerpt).toBe(full.excerpt)
+    expect(slim.slug).toBe(full.slug)
+  })
+})
 
 describe('mergeArticle title', () => {
   it('inherits the canonical title when no placement exists', () => {

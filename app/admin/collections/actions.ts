@@ -1,10 +1,12 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
+import { CONTENT_ARTICLES_TAG, CONTENT_COLLECTIONS_TAG } from '@/lib/cache/tags'
 import { serviceClient } from '@/lib/db/client'
 import { selectAll } from '@/lib/db/select-all'
 import { authorize } from '@/lib/authz/authorize'
-import { slugify, uniqueSlug } from '@/lib/content/slug'
+import { slugify } from '@/lib/content/slug'
+import { nextAvailableSlug } from '@/lib/content/unique-slug'
 import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { reindexArticleEverywhere } from '@/lib/search/index-article'
 
@@ -20,14 +22,7 @@ export async function createCollection(formData: FormData): Promise<void> {
 
   // Surface a read failure here rather than computing the slug against an empty
   // list, which would collide with an existing slug and fail opaquely on insert.
-  const existing = await selectAll(
-    // .order('id') gives stable, unique-key .range() pagination — see
-    // lib/db/select-all.ts.
-    () => db.from('collections').select('slug').order('id'),
-    'collection slugs',
-  )
-
-  const slug = uniqueSlug(slugify(title), existing.map((r) => r.slug))
+  const slug = await nextAvailableSlug('collections', slugify(title))
 
   const { data: collection, error } = await db
     .from('collections')
@@ -52,6 +47,7 @@ export async function createCollection(formData: FormData): Promise<void> {
 
   if (placementError) throw new Error(`Could not place collection: ${placementError.message}`)
 
+  updateTag(CONTENT_COLLECTIONS_TAG)
   revalidatePath('/admin/collections')
   revalidatePath('/')
 }
@@ -98,6 +94,10 @@ export async function deleteCollection(formData: FormData): Promise<void> {
     await reindexArticleEverywhere(articleId)
   }
 
+  // Both tags: the collection is gone from the list, and the articles that
+  // pointed at it have lost their effective collection.
+  updateTag(CONTENT_COLLECTIONS_TAG)
+  updateTag(CONTENT_ARTICLES_TAG)
   revalidatePath('/admin/collections')
   revalidatePath('/')
 }

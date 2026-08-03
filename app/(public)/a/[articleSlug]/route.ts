@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getBaseHelpCenterId } from '@/lib/tenancy/active'
-import { getEffectiveArticle, listEffectiveCollections } from '@/lib/content/queries'
+import { getCachedArticle, getCachedCollections } from '@/lib/content/cached'
 
 export async function GET(
   _request: Request,
@@ -9,10 +9,12 @@ export async function GET(
   const { articleSlug } = await params
   const baseId = await getBaseHelpCenterId()
 
-  const article = await getEffectiveArticle(baseId, articleSlug)
+  const [article, collections] = await Promise.all([
+    getCachedArticle(baseId, articleSlug),
+    getCachedCollections(baseId),
+  ])
   if (!article) redirect('/')
 
-  const collections = await listEffectiveCollections(baseId)
   const collection = collections.find((c) => c.id === article.collectionId)
 
   redirect(collection ? `/${collection.slug}/${article.slug}` : '/')

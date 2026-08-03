@@ -2,10 +2,10 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import {
-  getEffectiveArticle,
-  listEffectiveArticles,
-  listEffectiveCollections,
-} from '@/lib/content/queries'
+  getCachedArticle,
+  getCachedArticlesInCollection,
+  getCachedCollections,
+} from '@/lib/content/cached'
 import { addHeadingIds, extractHeadings } from '@/lib/content/toc'
 
 export default async function ArticlePage({
@@ -16,14 +16,18 @@ export default async function ArticlePage({
   const { collectionSlug, articleSlug } = await params
   const baseId = await getBaseHelpCenterId()
 
-  const article = await getEffectiveArticle(baseId, articleSlug)
+  // The article and the collection list are independent; only the sibling list
+  // depends on which collection the article resolves to.
+  const [article, collections] = await Promise.all([
+    getCachedArticle(baseId, articleSlug),
+    getCachedCollections(baseId),
+  ])
   if (!article) notFound()
 
-  const collections = await listEffectiveCollections(baseId)
   const collection = collections.find((c) => c.id === article.collectionId)
   if (!collection || collection.slug !== collectionSlug) notFound()
 
-  const siblings = await listEffectiveArticles(baseId, collection.id)
+  const siblings = await getCachedArticlesInCollection(baseId, collection.id)
   const index = siblings.findIndex((s) => s.id === article.id)
   const previous = index > 0 ? siblings[index - 1] : null
   const next = index >= 0 && index < siblings.length - 1 ? siblings[index + 1] : null

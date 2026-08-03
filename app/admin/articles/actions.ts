@@ -1,12 +1,13 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { CONTENT_ARTICLES_TAG } from '@/lib/cache/tags'
 import { serviceClient } from '@/lib/db/client'
-import { selectAll } from '@/lib/db/select-all'
 import { authorize } from '@/lib/authz/authorize'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/content/html'
-import { slugify, uniqueSlug } from '@/lib/content/slug'
+import { slugify } from '@/lib/content/slug'
+import { nextAvailableSlug } from '@/lib/content/unique-slug'
 import { getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { reindexArticleEverywhere } from '@/lib/search/index-article'
 import type { Json } from '@/lib/db/types'
@@ -17,13 +18,7 @@ export async function createArticle(): Promise<void> {
   const actor = await authorize('article.create', { helpCenterId: await getBaseHelpCenterId() })
   const db = serviceClient()
 
-  const existing = await selectAll(
-    // .order('id') gives stable, unique-key .range() pagination — see
-    // lib/db/select-all.ts.
-    () => db.from('articles').select('slug').order('id'),
-    'articles slugs',
-  )
-  const slug = uniqueSlug('untitled', existing.map((r) => r.slug))
+  const slug = await nextAvailableSlug('articles', 'untitled')
 
   const { data: article, error } = await db
     .from('articles')
@@ -75,6 +70,10 @@ export async function saveArticle(input: {
   // A save changes canonical content, which every help center that places the
   // article inherits, so reindex all of them — not just the active one.
   await reindexArticleEverywhere(input.articleId)
+  // Public reads are cached under this tag (lib/content/cached.ts). updateTag,
+  // not revalidateTag: only updateTag guarantees the editor sees their own
+  // change on the very next request rather than after the TTL.
+  updateTag(CONTENT_ARTICLES_TAG)
   revalidatePath('/admin/articles')
 }
 
@@ -94,11 +93,7 @@ export async function publishArticle(articleId: string): Promise<void> {
   // Replace the placeholder slug with one derived from the final title.
   let slug = article.slug
   if (slug.startsWith('untitled')) {
-    const existing = await selectAll(
-      () => db.from('articles').select('slug').neq('id', articleId).order('id'),
-      'articles slugs',
-    )
-    slug = uniqueSlug(slugify(article.title), existing.map((r) => r.slug))
+    slug = await nextAvailableSlug('articles', slugify(article.title), articleId)
   }
 
   const { error } = await db
@@ -128,6 +123,7 @@ export async function publishArticle(articleId: string): Promise<void> {
   // Publishing flips the status every brand reads through this placement, so
   // reindex it.
   await reindexArticleEverywhere(articleId)
+  updateTag(CONTENT_ARTICLES_TAG)
   revalidatePath('/admin/articles')
   revalidatePath('/', 'layout')
 }

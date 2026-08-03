@@ -1,18 +1,22 @@
 import { serviceClient } from '@/lib/db/client'
 import { selectAll } from '@/lib/db/select-all'
-import { mergeArticle, mergeCollection } from './merge'
+import { mergeArticle, mergeArticleSummary, mergeCollection } from './merge'
 import type {
   ArticlePlacement,
   BodyJson,
   CanonicalArticle,
+  CanonicalArticleSummary,
   CanonicalCollection,
   CollectionPlacement,
   EffectiveArticle,
+  EffectiveArticleSummary,
   EffectiveCollection,
 } from './types'
 
 const ARTICLE_FIELDS =
   'id, slug, title, excerpt, body_json, body_html, collection_id, status, published_at'
+/** ARTICLE_FIELDS minus the bodies, which are ~99% of a row's bytes. */
+const ARTICLE_SUMMARY_FIELDS = 'id, slug, title, excerpt, collection_id, status, published_at'
 const COLLECTION_FIELDS = 'id, slug, title, description, icon'
 
 type ArticleRow = {
@@ -121,39 +125,84 @@ export async function listEffectiveCollections(
   })
 }
 
-/** Visible, published articles in a collection, in display order. */
+type ArticleSummaryRow = Omit<ArticleRow, 'body_json' | 'body_html'>
+
+function toCanonicalArticleSummary(row: ArticleSummaryRow): CanonicalArticleSummary {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt,
+    collectionId: row.collection_id,
+    status: row.status as CanonicalArticleSummary['status'],
+    publishedAt: row.published_at,
+  }
+}
+
+type SummaryRow = {
+  article_id: string
+  position: number
+  is_hidden: boolean
+  title_override: string | null
+  collection_override_id: string | null
+  articles: unknown
+}
+
+/**
+ * Visible, published articles in a collection, in display order.
+ *
+ * An article's effective collection is `collection_override_id ?? articles
+ * .collection_id`, which spans a placement column and a joined column. PostgREST
+ * rejects a top-level `or=()` that references an embedded table's column, so the
+ * two branches have to be two queries — run in parallel and merged here. The
+ * alternative, fetching the whole catalog and filtering in JS, moved every
+ * article body over the wire on every collection view.
+ */
 export async function listEffectiveArticles(
   baseHelpCenterId: string,
   collectionId: string,
-): Promise<EffectiveArticle[]> {
-  const data = await selectAll(
-    () =>
-      serviceClient()
-        .from('help_center_articles')
-        .select(
-          `help_center_id, article_id, position, is_hidden, title_override,
-           body_json_override, body_html_override, collection_override_id,
-           articles!inner (${ARTICLE_FIELDS})`,
-        )
-        .eq('help_center_id', baseHelpCenterId)
-        .eq('is_hidden', false)
-        .eq('articles.status', 'published')
-        // See the ordering note in listEffectiveCollections above. article_id
-        // is unique per help_center_id (composite PK).
-        .order('position', { ascending: true })
-        .order('article_id', { ascending: true }),
-    'listEffectiveArticles',
-  )
+): Promise<EffectiveArticleSummary[]> {
+  const visiblePublished = () =>
+    serviceClient()
+      .from('help_center_articles')
+      .select(
+        `article_id, position, is_hidden, title_override, collection_override_id,
+         articles!inner (${ARTICLE_SUMMARY_FIELDS})`,
+      )
+      .eq('help_center_id', baseHelpCenterId)
+      .eq('is_hidden', false)
+      .eq('articles.status', 'published')
+      // See the ordering note in listEffectiveCollections above. article_id
+      // is unique per help_center_id (composite PK).
+      .order('position', { ascending: true })
+      .order('article_id', { ascending: true })
 
-  return data
+  const [overridden, canonical] = await Promise.all([
+    selectAll<SummaryRow>(
+      () => visiblePublished().eq('collection_override_id', collectionId),
+      'listEffectiveArticles (overridden)',
+    ),
+    selectAll<SummaryRow>(
+      () =>
+        visiblePublished()
+          .is('collection_override_id', null)
+          .eq('articles.collection_id', collectionId),
+      'listEffectiveArticles (canonical)',
+    ),
+  ])
+
+  return [...overridden, ...canonical]
     .map((row) =>
-      mergeArticle(
-        toCanonicalArticle(row.articles as unknown as ArticleRow),
-        toArticlePlacement(row as PlacementRow),
-      ),
+      mergeArticleSummary(toCanonicalArticleSummary(row.articles as ArticleSummaryRow), {
+        position: row.position,
+        isHidden: row.is_hidden,
+        titleOverride: row.title_override,
+        collectionOverrideId: row.collection_override_id,
+      }),
     )
-    // The collection can be overridden per help center, so filter after merging.
-    .filter((article) => article.collectionId === collectionId)
+    // Each query is ordered, but their concatenation is not. Re-sort on the same
+    // (position, article_id) key the database used so display order is unchanged.
+    .sort((a, b) => a.position - b.position || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 }
 
 /** One published, visible article by slug, or null. */
@@ -196,7 +245,7 @@ type ArticleCountRow = {
  */
 export async function countArticlesPerCollection(
   baseHelpCenterId: string,
-): Promise<Map<string, number>> {
+): Promise<Record<string, number>> {
   const data = await selectAll(
     () =>
       serviceClient()
@@ -212,13 +261,15 @@ export async function countArticlesPerCollection(
     'countArticlesPerCollection',
   )
 
-  const counts = new Map<string, number>()
+  // A plain record, not a Map: this result is cached across requests, and the
+  // cache round-trips through JSON, which turns a Map into {}.
+  const counts: Record<string, number> = {}
 
   for (const row of data as ArticleCountRow[]) {
     const canonical = Array.isArray(row.articles) ? row.articles[0] : row.articles
     const collectionId = row.collection_override_id ?? canonical?.collection_id ?? null
     if (!collectionId) continue
-    counts.set(collectionId, (counts.get(collectionId) ?? 0) + 1)
+    counts[collectionId] = (counts[collectionId] ?? 0) + 1
   }
 
   return counts

@@ -34,6 +34,18 @@ export type EffectiveArticle = CanonicalArticle & {
   isOverridden: boolean
 }
 
+/**
+ * An article without its body. List views render only titles and excerpts, and
+ * bodies dominate the row size — a whole collection of these costs less to
+ * fetch than a handful of full articles.
+ */
+export type CanonicalArticleSummary = Omit<CanonicalArticle, 'bodyJson' | 'bodyHtml'>
+
+export type EffectiveArticleSummary = CanonicalArticleSummary & {
+  position: number
+  isHidden: boolean
+}
+
 export type CanonicalCollection = {
   id: string
   slug: string

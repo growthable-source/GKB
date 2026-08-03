@@ -1,6 +1,8 @@
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
 import { headers } from 'next/headers'
 import { serviceClient } from '@/lib/db/client'
+import { BRAND_TAG, BRAND_TTL_SECONDS } from '@/lib/cache/tags'
 
 export type ActiveHelpCenter = {
   id: string
@@ -90,6 +92,45 @@ async function findBySlug(
 }
 
 /**
+ * Cross-request caches over the three brand lookups. React's cache() below
+ * dedupes only within one render; help_centers and custom_domains rows change
+ * roughly never, so re-querying them per visitor cost every route in the app —
+ * including /login and /admin — a round trip before any page code ran.
+ *
+ * Only the DB reads are cached. The headers() read stays in the request-scoped
+ * function below, where it belongs.
+ */
+const cachedFindByHostname = unstable_cache(
+  (hostname: string) => findByHostname(serviceClient(), hostname),
+  ['help-center-by-hostname'],
+  { tags: [BRAND_TAG], revalidate: BRAND_TTL_SECONDS },
+)
+
+const cachedFindBySlug = unstable_cache(
+  (slug: string) => findBySlug(serviceClient(), slug),
+  ['help-center-by-slug'],
+  { tags: [BRAND_TAG], revalidate: BRAND_TTL_SECONDS },
+)
+
+// Returns null rather than throwing on a missing base row, so it can be
+// prefetched alongside the host lookups without turning a resolvable request
+// into an error. Callers that actually need the row throw.
+const cachedFindBase = unstable_cache(
+  async (): Promise<HelpCenterRow | null> => {
+    const { data, error } = await serviceClient()
+      .from('help_centers')
+      .select(HELP_CENTER_FIELDS)
+      .eq('is_base', true)
+      .maybeSingle()
+
+    if (error) throw new Error(`No base help center found: ${error.message}`)
+    return data
+  },
+  ['help-center-base'],
+  { tags: [BRAND_TAG], revalidate: BRAND_TTL_SECONDS },
+)
+
+/**
  * The help center serving the current request, resolved from the Host header:
  * an exact custom-domain match, then a slug match on the hostname's first DNS
  * label, then the base center. `headers()` is request-scoped, so caching this
@@ -103,39 +144,33 @@ async function findBySlug(
  */
 export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => {
   const requestHeaders = await headers()
-  const db = serviceClient()
 
   const previewSlug = requestHeaders.get('x-preview-help-center-slug')
-  if (previewSlug) {
-    const preview = await findBySlug(db, previewSlug)
-    if (preview) return toActiveHelpCenter(preview)
-  }
+  const hostname = requestHeaders.get('host')?.split(':')[0].toLowerCase() ?? ''
+  const label = hostname.split('.')[0]
+  const wantsSlug = Boolean(label) && label !== 'www'
 
-  const host = requestHeaders.get('host')
-  const hostname = host?.split(':')[0].toLowerCase() ?? ''
+  // Every candidate is an independent lookup and most requests match none of
+  // them, so resolving them concurrently costs one round trip instead of up to
+  // four. Precedence is decided below, by the order of these checks — never by
+  // which query happens to resolve first.
+  const [preview, byDomain, bySlug, base] = await Promise.all([
+    // Deliberately NOT cached. `?preview=` accepts any string from any visitor,
+    // so caching it would let anyone flood the data cache with junk keys. The
+    // host lookups below are safe to cache: Vercel only routes a request here
+    // when its Host matches a domain assigned to this deployment.
+    previewSlug ? findBySlug(serviceClient(), previewSlug) : null,
+    hostname ? cachedFindByHostname(hostname) : null,
+    hostname && wantsSlug ? cachedFindBySlug(label) : null,
+    cachedFindBase(),
+  ])
 
-  if (hostname) {
-    const byDomain = await findByHostname(db, hostname)
-    if (byDomain) return toActiveHelpCenter(byDomain)
+  if (preview) return toActiveHelpCenter(preview)
+  if (byDomain) return toActiveHelpCenter(byDomain)
+  if (bySlug) return toActiveHelpCenter(bySlug)
+  if (!base) throw new Error('No base help center found: missing row')
 
-    const label = hostname.split('.')[0]
-    if (label && label !== 'www') {
-      const bySlug = await findBySlug(db, label)
-      if (bySlug) return toActiveHelpCenter(bySlug)
-    }
-  }
-
-  const { data, error } = await db
-    .from('help_centers')
-    .select(HELP_CENTER_FIELDS)
-    .eq('is_base', true)
-    .single()
-
-  if (error || !data) {
-    throw new Error(`No base help center found: ${error?.message ?? 'missing row'}`)
-  }
-
-  return toActiveHelpCenter(data)
+  return toActiveHelpCenter(base)
 })
 
 /**
@@ -153,13 +188,10 @@ export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => 
  * or diverged content.
  */
 export const getBaseHelpCenterId = cache(async (): Promise<string> => {
-  const { data, error } = await serviceClient()
-    .from('help_centers')
-    .select('id')
-    .eq('is_base', true)
-    .single()
-  if (error || !data) {
-    throw new Error(`No base help center found: ${error?.message ?? 'missing row'}`)
-  }
-  return data.id
+  // Shares cachedFindBase with getActiveHelpCenter rather than issuing its own
+  // is_base query: this is the highest-frequency, lowest-volatility read in the
+  // codebase, and most requests need both the brand and the content owner.
+  const base = await cachedFindBase()
+  if (!base) throw new Error('No base help center found: missing row')
+  return base.id
 })

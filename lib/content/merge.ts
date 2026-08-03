@@ -1,9 +1,11 @@
 import type {
   ArticlePlacement,
   CanonicalArticle,
+  CanonicalArticleSummary,
   CanonicalCollection,
   CollectionPlacement,
   EffectiveArticle,
+  EffectiveArticleSummary,
   EffectiveCollection,
 } from './types'
 
@@ -45,6 +47,29 @@ export function mergeArticle(
     position: placement?.position ?? 0,
     isHidden: placement?.isHidden ?? false,
     isOverridden: titleChanged || bodyChanged || collectionChanged,
+  }
+}
+
+/**
+ * The body-free half of mergeArticle, for list views. Applies the same title
+ * and collection precedence; it just has no body to merge, and so no basis to
+ * compute isOverridden (which counts body edits too).
+ */
+export function mergeArticleSummary(
+  canonical: CanonicalArticleSummary,
+  placement: Pick<
+    ArticlePlacement,
+    'position' | 'isHidden' | 'titleOverride' | 'collectionOverrideId'
+  >,
+): EffectiveArticleSummary {
+  const title = normalizeOverride(placement.titleOverride)
+
+  return {
+    ...canonical,
+    title: title ?? canonical.title,
+    collectionId: placement.collectionOverrideId ?? canonical.collectionId,
+    position: placement.position,
+    isHidden: placement.isHidden,
   }
 }
 

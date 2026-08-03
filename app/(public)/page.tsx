@@ -1,13 +1,14 @@
 import Link from 'next/link'
 import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
-import { countArticlesPerCollection, listEffectiveCollections } from '@/lib/content/queries'
+import { getCachedArticleCounts, getCachedCollections } from '@/lib/content/cached'
 import { SearchBox } from '@/components/public/search-box'
 
 export default async function HomePage() {
-  const helpCenter = await getActiveHelpCenter()
-  const baseId = await getBaseHelpCenterId()
-  const collections = await listEffectiveCollections(baseId)
-  const counts = await countArticlesPerCollection(baseId)
+  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+  const [collections, counts] = await Promise.all([
+    getCachedCollections(baseId),
+    getCachedArticleCounts(baseId),
+  ])
 
   return (
     <>
@@ -38,7 +39,7 @@ export default async function HomePage() {
                   <p className="mt-1 text-sm text-neutral-600">{collection.description}</p>
                 )}
                 <p className="hc-secondary-muted mt-3 text-xs">
-                  {counts.get(collection.id) ?? 0} articles
+                  {counts[collection.id] ?? 0} articles
                 </p>
               </Link>
             </li>
