@@ -94,11 +94,25 @@ async function findBySlug(
  * an exact custom-domain match, then a slug match on the hostname's first DNS
  * label, then the base center. `headers()` is request-scoped, so caching this
  * per request with `cache()` stays correct.
+ *
+ * A `?preview=<slug>` query param (translated to the x-preview-help-center-
+ * slug header by middleware.ts, since only middleware sees the URL) wins
+ * over host resolution — it lets any center's BRANDING be viewed on this
+ * deployment's own URL ahead of a tenant domain existing. Falls through to
+ * normal resolution on an unknown slug rather than erroring.
  */
 export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => {
-  const host = (await headers()).get('host')
-  const hostname = host?.split(':')[0].toLowerCase() ?? ''
+  const requestHeaders = await headers()
   const db = serviceClient()
+
+  const previewSlug = requestHeaders.get('x-preview-help-center-slug')
+  if (previewSlug) {
+    const preview = await findBySlug(db, previewSlug)
+    if (preview) return toActiveHelpCenter(preview)
+  }
+
+  const host = requestHeaders.get('host')
+  const hostname = host?.split(':')[0].toLowerCase() ?? ''
 
   if (hostname) {
     const byDomain = await findByHostname(db, hostname)

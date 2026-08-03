@@ -90,11 +90,30 @@ export default async function CentersPage({
                 </p>
                 <p className="text-sm text-neutral-500">
                   {tenantDomain ? (
-                    `https://${center.slug}.${tenantDomain}`
+                    <a
+                      href={`https://${center.slug}.${tenantDomain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      {`https://${center.slug}.${tenantDomain}`}
+                    </a>
                   ) : (
                     <>
-                      {center.slug}{' '}
-                      <span className="text-neutral-400">(no tenant domain configured)</span>
+                      <a
+                        // No tenant domain yet — preview on this deployment's
+                        // own URL via the ?preview= override (see
+                        // middleware.ts and getActiveHelpCenter).
+                        href={center.is_base ? '/' : `/?preview=${center.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {center.slug}
+                      </a>{' '}
+                      <span className="text-neutral-400">
+                        (preview — no tenant domain configured yet)
+                      </span>
                     </>
                   )}
                 </p>
