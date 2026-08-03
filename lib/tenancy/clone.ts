@@ -13,6 +13,7 @@ export type CloneHelpCenterInput = {
   primaryHex: string
   secondaryHex: string
   logoUrl?: string | null
+  faviconUrl?: string | null
   headline?: string
   subtitle?: string
 }
@@ -71,6 +72,7 @@ export async function cloneHelpCenter(input: CloneHelpCenterInput): Promise<Clon
       primary_hex: input.primaryHex,
       secondary_hex: input.secondaryHex,
       logo_url: input.logoUrl || null,
+      favicon_url: input.faviconUrl || null,
       visibility: 'public',
       auto_include_new_articles: true,
       settings,

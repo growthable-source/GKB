@@ -9,13 +9,15 @@ export type ActiveHelpCenter = {
   primaryHex: string
   secondaryHex: string
   logoUrl: string | null
+  faviconUrl: string | null
   visibility: 'public' | 'authenticated'
   settings: { headline?: string; subtitle?: string }
 }
 
 const VALID_VISIBILITIES = ['public', 'authenticated'] as const
 
-const HELP_CENTER_FIELDS = 'id, slug, name, primary_hex, secondary_hex, logo_url, visibility, settings'
+const HELP_CENTER_FIELDS =
+  'id, slug, name, primary_hex, secondary_hex, logo_url, favicon_url, visibility, settings'
 
 type HelpCenterRow = {
   id: string
@@ -24,6 +26,7 @@ type HelpCenterRow = {
   primary_hex: string
   secondary_hex: string
   logo_url: string | null
+  favicon_url: string | null
   visibility: string
   settings: unknown
 }
@@ -50,6 +53,7 @@ function toActiveHelpCenter(row: HelpCenterRow): ActiveHelpCenter {
     primaryHex: row.primary_hex,
     secondaryHex: row.secondary_hex,
     logoUrl: row.logo_url,
+    faviconUrl: row.favicon_url,
     visibility: parseVisibility(row.visibility),
     settings: (row.settings ?? {}) as ActiveHelpCenter['settings'],
   }

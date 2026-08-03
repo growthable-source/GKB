@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { getActiveHelpCenter } from "@/lib/tenancy/active";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,10 +13,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Help Center",
-  description: "Find answers and browse help articles.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const helpCenter = await getActiveHelpCenter();
+
+  return {
+    title: "Help Center",
+    description: "Find answers and browse help articles.",
+    icons: helpCenter.faviconUrl ? { icon: helpCenter.faviconUrl } : undefined,
+  };
+}
 
 export default function RootLayout({
   children,

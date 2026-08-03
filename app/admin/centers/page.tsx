@@ -13,7 +13,7 @@ export default async function CentersPage({
 
   const { data: centers, error } = await db
     .from('help_centers')
-    .select('id, name, slug, is_base, primary_hex, secondary_hex')
+    .select('id, name, slug, is_base, primary_hex, secondary_hex, logo_url, favicon_url')
     .order('is_base', { ascending: false })
     .order('name', { ascending: true })
   if (error) throw new Error(`Could not load help centers: ${error.message}`)
@@ -63,6 +63,22 @@ export default async function CentersPage({
                   title={`Secondary ${center.secondary_hex}`}
                 />
               </div>
+              {center.logo_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={center.logo_url}
+                  alt=""
+                  className="h-5 w-5 object-contain"
+                />
+              )}
+              {center.favicon_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={center.favicon_url}
+                  alt=""
+                  className="h-4 w-4 object-contain"
+                />
+              )}
               <div>
                 <p className="flex items-center gap-2 font-medium">
                   {center.name}

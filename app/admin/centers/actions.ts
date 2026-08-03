@@ -23,6 +23,7 @@ export async function createHelpCenter(
   const primaryHex = String(formData.get('primaryHex') ?? '').trim() || DEFAULT_PRIMARY_HEX
   const secondaryHex = String(formData.get('secondaryHex') ?? '').trim() || DEFAULT_SECONDARY_HEX
   const logoUrl = String(formData.get('logoUrl') ?? '').trim() || undefined
+  const faviconUrl = String(formData.get('faviconUrl') ?? '').trim() || undefined
   const headline = String(formData.get('headline') ?? '').trim() || undefined
   const subtitle = String(formData.get('subtitle') ?? '').trim() || undefined
 
@@ -34,6 +35,7 @@ export async function createHelpCenter(
       primaryHex,
       secondaryHex,
       logoUrl,
+      faviconUrl,
       headline,
       subtitle,
     })
