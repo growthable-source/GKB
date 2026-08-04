@@ -1,15 +1,20 @@
 import Link from 'next/link'
 import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
-import { getCachedArticleCounts, getCachedCollections } from '@/lib/content/cached'
+import { getCachedArticleCollectionIndex, getCachedCollections } from '@/lib/content/cached'
+import { countArticlesPerCollection } from '@/lib/content/queries'
+import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 import { tileGridClasses } from '@/lib/tenancy/theme'
 import { SearchBox } from '@/components/public/search-box'
 
 export default async function HomePage() {
   const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
-  const [collections, counts] = await Promise.all([
+  const [collections, index, excluded] = await Promise.all([
     getCachedCollections(baseId),
-    getCachedArticleCounts(baseId),
+    getCachedArticleCollectionIndex(baseId),
+    // This center's hidden articles, so its tile counts match what it shows.
+    getExcludedArticleIds(helpCenter.id),
   ])
+  const counts = countArticlesPerCollection(index, excluded)
 
   return (
     <>

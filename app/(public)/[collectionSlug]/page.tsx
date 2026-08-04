@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
 import { getCachedArticlesInCollection, getCachedCollections } from '@/lib/content/cached'
+import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 
 export default async function CollectionPage({
   params,
@@ -9,13 +10,17 @@ export default async function CollectionPage({
   params: Promise<{ collectionSlug: string }>
 }) {
   const { collectionSlug } = await params
-  const baseId = await getBaseHelpCenterId()
+  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
 
   const collections = await getCachedCollections(baseId)
   const collection = collections.find((c) => c.slug === collectionSlug)
   if (!collection) notFound()
 
-  const articles = await getCachedArticlesInCollection(baseId, collection.id)
+  const [allArticles, excluded] = await Promise.all([
+    getCachedArticlesInCollection(baseId, collection.id),
+    getExcludedArticleIds(helpCenter.id),
+  ])
+  const articles = allArticles.filter((article) => !excluded.has(article.id))
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">

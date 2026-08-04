@@ -5,8 +5,8 @@ import {
   CONTENT_TTL_SECONDS,
 } from '@/lib/cache/tags'
 import {
-  countArticlesPerCollection,
   getEffectiveArticle,
+  listArticleCollectionIndex,
   listEffectiveArticles,
   listEffectiveCollections,
 } from './queries'
@@ -36,8 +36,13 @@ export const getCachedArticle = unstable_cache(getEffectiveArticle, ['effective-
   revalidate: CONTENT_TTL_SECONDS,
 })
 
-export const getCachedArticleCounts = unstable_cache(
-  countArticlesPerCollection,
-  ['article-counts-per-collection'],
+/**
+ * Cached once for the platform, not per center: the article-to-collection
+ * mapping is identical everywhere. Callers subtract their own center's
+ * exclusions afterwards with countArticlesPerCollection.
+ */
+export const getCachedArticleCollectionIndex = unstable_cache(
+  listArticleCollectionIndex,
+  ['article-collection-index'],
   { tags: [CONTENT_ARTICLES_TAG], revalidate: CONTENT_TTL_SECONDS },
 )

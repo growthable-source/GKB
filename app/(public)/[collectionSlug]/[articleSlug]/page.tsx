@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 import {
   getCachedArticle,
   getCachedArticlesInCollection,
@@ -14,20 +15,23 @@ export default async function ArticlePage({
   params: Promise<{ collectionSlug: string; articleSlug: string }>
 }) {
   const { collectionSlug, articleSlug } = await params
-  const baseId = await getBaseHelpCenterId()
+  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
 
   // The article and the collection list are independent; only the sibling list
   // depends on which collection the article resolves to.
-  const [article, collections] = await Promise.all([
+  const [article, collections, excluded] = await Promise.all([
     getCachedArticle(baseId, articleSlug),
     getCachedCollections(baseId),
+    getExcludedArticleIds(helpCenter.id),
   ])
-  if (!article) notFound()
+  // Excluded means excluded however you arrive, not just from the listings.
+  if (!article || excluded.has(article.id)) notFound()
 
   const collection = collections.find((c) => c.id === article.collectionId)
   if (!collection || collection.slug !== collectionSlug) notFound()
 
-  const siblings = await getCachedArticlesInCollection(baseId, collection.id)
+  const allSiblings = await getCachedArticlesInCollection(baseId, collection.id)
+  const siblings = allSiblings.filter((sibling) => !excluded.has(sibling.id))
   const index = siblings.findIndex((s) => s.id === article.id)
   const previous = index > 0 ? siblings[index - 1] : null
   const next = index >= 0 && index < siblings.length - 1 ? siblings[index + 1] : null

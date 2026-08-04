@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 import { searchHelpCenter } from '@/lib/search/search'
 
 export async function GET(request: Request) {
@@ -7,8 +8,9 @@ export async function GET(request: Request) {
   if (!query.trim()) return NextResponse.json({ hits: [] })
 
   try {
-    const baseId = await getBaseHelpCenterId()
-    const hits = await searchHelpCenter(baseId, query, 8)
+    const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+    const excluded = await getExcludedArticleIds(helpCenter.id)
+    const hits = await searchHelpCenter(baseId, query, 8, excluded)
     return NextResponse.json({ hits })
   } catch (error) {
     // Log the real error server-side; the response must not leak internals.

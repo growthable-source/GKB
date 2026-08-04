@@ -2,7 +2,7 @@
 
 import { revalidatePath, updateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { CONTENT_ARTICLES_TAG } from '@/lib/cache/tags'
+import { CONTENT_ARTICLES_TAG, EXCLUSIONS_TAG } from '@/lib/cache/tags'
 import { serviceClient } from '@/lib/db/client'
 import { authorize } from '@/lib/authz/authorize'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/content/html'
@@ -75,6 +75,65 @@ export async function saveArticle(input: {
   // change on the very next request rather than after the TTL.
   updateTag(CONTENT_ARTICLES_TAG)
   revalidatePath('/admin/articles')
+}
+
+/**
+ * Replaces the set of help centers that hide this article.
+ *
+ * The base center is rejected outright, not merely hidden in the UI: excluding
+ * an article there would take it out of the shared pool every center reads
+ * through (see lib/tenancy/active.ts), which is what unpublishing is for.
+ */
+export async function setArticleExclusions(
+  articleId: string,
+  excludedHelpCenterIds: string[],
+): Promise<void> {
+  const baseId = await getBaseHelpCenterId()
+  await authorize('article.update', { helpCenterId: baseId })
+
+  if (excludedHelpCenterIds.includes(baseId)) {
+    throw new Error('The base help center cannot be excluded — unpublish the article instead.')
+  }
+
+  const db = serviceClient()
+
+  // Replace rather than diff: the set is tiny and a delete-then-insert cannot
+  // leave a stale row behind the way a partial update can.
+  const { error: clearError } = await db
+    .from('help_center_article_exclusions')
+    .delete()
+    .eq('article_id', articleId)
+  if (clearError) throw new Error(`Could not clear exclusions: ${clearError.message}`)
+
+  if (excludedHelpCenterIds.length > 0) {
+    const { error: insertError } = await db.from('help_center_article_exclusions').insert(
+      excludedHelpCenterIds.map((helpCenterId) => ({
+        help_center_id: helpCenterId,
+        article_id: articleId,
+      })),
+    )
+    if (insertError) throw new Error(`Could not save exclusions: ${insertError.message}`)
+  }
+
+  updateTag(EXCLUSIONS_TAG)
+  revalidatePath('/', 'layout')
+}
+
+export async function deleteArticle(articleId: string): Promise<void> {
+  await authorize('article.delete', { helpCenterId: await getBaseHelpCenterId() })
+
+  // Placements, search rows and exclusions all cascade from articles.id, so the
+  // single delete leaves nothing orphaned.
+  const { error } = await serviceClient().from('articles').delete().eq('id', articleId)
+  if (error) throw new Error(`Could not delete article: ${error.message}`)
+
+  updateTag(CONTENT_ARTICLES_TAG)
+  updateTag(EXCLUSIONS_TAG)
+  revalidatePath('/admin/articles')
+  revalidatePath('/', 'layout')
+  // No redirect() here: this is called from a client transition, where a thrown
+  // NEXT_REDIRECT is indistinguishable from a real failure in the caller's
+  // catch. The editor navigates on success instead.
 }
 
 export async function publishArticle(articleId: string): Promise<void> {

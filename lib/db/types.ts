@@ -242,6 +242,39 @@ export type Database = {
           },
         ]
       }
+      help_center_article_exclusions: {
+        Row: {
+          article_id: string
+          created_at: string
+          help_center_id: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          help_center_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          help_center_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "help_center_article_exclusions_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "help_center_article_exclusions_help_center_id_fkey"
+            columns: ["help_center_id"]
+            isOneToOne: false
+            referencedRelation: "help_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       help_center_articles: {
         Row: {
           article_id: string

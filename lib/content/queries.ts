@@ -233,43 +233,74 @@ export async function getEffectiveArticle(
 }
 
 type ArticleCountRow = {
+  article_id: string
   collection_override_id: string | null
   articles: { collection_id: string | null } | { collection_id: string | null }[] | null
 }
 
+/** An article and the collection it effectively belongs to. */
+export type ArticleCollectionEntry = { id: string; collectionId: string }
+
 /**
- * Article counts per collection, for the home page grid. Fetches only the id
- * fields needed to determine each visible, published article's effective
- * collection (see mergeArticle) and counts in JS, rather than fetching every
- * article's full body once per collection.
+ * Every visible, published article paired with its effective collection.
+ *
+ * Returns the pairs rather than counts so a caller can subtract a help center's
+ * exclusions before counting — a pre-aggregated number cannot be adjusted. It
+ * fetches only the two id fields, so the whole catalog is a small payload, and
+ * it is cached once for the platform because the mapping is identical for every
+ * center.
  */
-export async function countArticlesPerCollection(
+export async function listArticleCollectionIndex(
   baseHelpCenterId: string,
-): Promise<Record<string, number>> {
+): Promise<ArticleCollectionEntry[]> {
   const data = await selectAll(
     () =>
       serviceClient()
         .from('help_center_articles')
-        .select('collection_override_id, articles!inner (collection_id)')
+        .select('article_id, collection_override_id, articles!inner (collection_id)')
         .eq('help_center_id', baseHelpCenterId)
         .eq('is_hidden', false)
         .eq('articles.status', 'published')
         // Order needed for stable .range() pagination (see the note in
         // listEffectiveCollections); display order doesn't matter here since
-        // rows are only counted, not shown.
+        // these rows are only counted, not shown.
         .order('article_id', { ascending: true }),
-    'countArticlesPerCollection',
+    'listArticleCollectionIndex',
   )
 
-  // A plain record, not a Map: this result is cached across requests, and the
-  // cache round-trips through JSON, which turns a Map into {}.
-  const counts: Record<string, number> = {}
+  const entries: ArticleCollectionEntry[] = []
 
   for (const row of data as ArticleCountRow[]) {
     const canonical = Array.isArray(row.articles) ? row.articles[0] : row.articles
     const collectionId = row.collection_override_id ?? canonical?.collection_id ?? null
+    // An article with no effective collection has no public URL, so it belongs
+    // to no tile and is not counted anywhere.
     if (!collectionId) continue
-    counts[collectionId] = (counts[collectionId] ?? 0) + 1
+    entries.push({ id: row.article_id, collectionId })
+  }
+
+  return entries
+}
+
+/**
+ * Article counts per collection for the home page grid, with one center's
+ * excluded articles left out.
+ *
+ * Pure, so it is not cached: the index it reads is, and the exclusion set is,
+ * but their combination is per-center and cheap to recompute.
+ *
+ * A plain record, not a Map — anything that might cross the data cache has to
+ * survive JSON, and a Map does not.
+ */
+export function countArticlesPerCollection(
+  index: ArticleCollectionEntry[],
+  excludedArticleIds: Set<string>,
+): Record<string, number> {
+  const counts: Record<string, number> = {}
+
+  for (const entry of index) {
+    if (excludedArticleIds.has(entry.id)) continue
+    counts[entry.collectionId] = (counts[entry.collectionId] ?? 0) + 1
   }
 
   return counts

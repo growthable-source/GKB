@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 import { searchHelpCenter } from '@/lib/search/search'
 import { SearchBox } from '@/components/public/search-box'
 
@@ -9,8 +10,9 @@ export default async function SearchPage({
   searchParams: Promise<{ q?: string }>
 }) {
   const { q = '' } = await searchParams
-  const baseId = await getBaseHelpCenterId()
-  const hits = q.trim() ? await searchHelpCenter(baseId, q, 30) : []
+  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+  const excluded = await getExcludedArticleIds(helpCenter.id)
+  const hits = q.trim() ? await searchHelpCenter(baseId, q, 30, excluded) : []
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">

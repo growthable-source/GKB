@@ -6,6 +6,9 @@ import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { EditorToolbar } from './editor-toolbar'
+import { CenterVisibility, type SelectableCenter } from './center-visibility'
 
 type Props = {
   articleId: string
@@ -13,6 +16,9 @@ type Props = {
   initialBodyJson: Record<string, unknown> | null
   collections: { id: string; title: string }[]
   initialCollectionId: string | null
+  /** Excludable centers — the base center is not among them. */
+  centers: SelectableCenter[]
+  initialExcludedCenterIds: string[]
   onSave: (input: {
     articleId: string
     title: string
@@ -21,6 +27,8 @@ type Props = {
     bodyHtml: string
   }) => Promise<void>
   onPublish: (articleId: string) => Promise<void>
+  onSetExclusions: (articleId: string, excludedHelpCenterIds: string[]) => Promise<void>
+  onDelete: (articleId: string) => Promise<void>
 }
 
 export function ArticleEditor({
@@ -29,13 +37,19 @@ export function ArticleEditor({
   initialBodyJson,
   collections,
   initialCollectionId,
+  centers,
+  initialExcludedCenterIds,
   onSave,
   onPublish,
+  onSetExclusions,
+  onDelete,
 }: Props) {
   const [title, setTitle] = useState(initialTitle)
   const [collectionId, setCollectionId] = useState(initialCollectionId ?? '')
+  const [excludedCenterIds, setExcludedCenterIds] = useState(initialExcludedCenterIds)
   const [status, setStatus] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const router = useRouter()
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -64,10 +78,26 @@ export function ArticleEditor({
           bodyJson: editor.getJSON() as Record<string, unknown>,
           bodyHtml: editor.getHTML(),
         })
+        // Visibility saves with the article rather than on every checkbox click,
+        // so ticking several centers is one write and can be abandoned.
+        await onSetExclusions(articleId, excludedCenterIds)
         if (then) await then()
         setStatus('Saved')
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Save failed')
+      }
+    })
+  }
+
+  function remove() {
+    if (!window.confirm(`Delete “${title}”? This cannot be undone.`)) return
+    setStatus(null)
+    startTransition(async () => {
+      try {
+        await onDelete(articleId)
+        router.push('/admin/articles')
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Delete failed')
       }
     })
   }
@@ -125,11 +155,20 @@ export function ArticleEditor({
         />
       </label>
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-6">
-        <EditorContent editor={editor} />
+      <div>
+        <EditorToolbar editor={editor} />
+        <div className="rounded-b-lg border border-neutral-200 bg-white p-6">
+          <EditorContent editor={editor} />
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <CenterVisibility
+        centers={centers}
+        excludedIds={excludedCenterIds}
+        onChange={setExcludedCenterIds}
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={() => save()}
           disabled={pending}
@@ -145,6 +184,14 @@ export function ArticleEditor({
           Save and publish
         </button>
         {status && <span className="text-sm text-neutral-500">{status}</span>}
+
+        <button
+          onClick={remove}
+          disabled={pending}
+          className="ml-auto rounded-md border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          Delete
+        </button>
       </div>
     </div>
   )

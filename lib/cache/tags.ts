@@ -9,6 +9,9 @@
 export const CONTENT_ARTICLES_TAG = 'content:articles'
 export const CONTENT_COLLECTIONS_TAG = 'content:collections'
 export const BRAND_TAG = 'brand:centers'
+/** Which articles each center hides. Separate from content: the content itself
+ *  is identical across centers, only the visibility filter differs. */
+export const EXCLUSIONS_TAG = 'brand:exclusions'
 
 /** Backstop only — every mutation busts its tags explicitly. */
 export const CONTENT_TTL_SECONDS = 300
