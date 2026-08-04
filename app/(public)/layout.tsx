@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { getActiveHelpCenter } from '@/lib/tenancy/active'
 import { safeHex, DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
+import { heroBackground, heroForeground, HERO_FOREGROUND_HEX } from '@/lib/tenancy/theme'
+import { fontStack } from '@/lib/fonts/options'
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const helpCenter = await getActiveHelpCenter()
@@ -12,6 +14,13 @@ export default async function PublicLayout({ children }: { children: React.React
         {
           '--hc-primary': safeHex(helpCenter.primaryHex, DEFAULT_PRIMARY_HEX),
           '--hc-secondary': safeHex(helpCenter.secondaryHex, DEFAULT_SECONDARY_HEX),
+          '--hc-hero-bg': heroBackground(helpCenter),
+          '--hc-hero-fg': HERO_FOREGROUND_HEX[heroForeground(helpCenter)],
+          // headingFont falls back to the body font, so a center that picks one
+          // font gets it everywhere.
+          '--hc-font-heading': fontStack(helpCenter.headingFont ?? helpCenter.bodyFont),
+          '--hc-font-body': fontStack(helpCenter.bodyFont),
+          fontFamily: 'var(--hc-font-body)',
         } as React.CSSProperties
       }
     >

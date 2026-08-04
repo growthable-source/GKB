@@ -384,6 +384,11 @@ export type Database = {
           created_at: string
           favicon_url: string | null
           font_family: string | null
+          heading_font: string | null
+          hero_angle: number
+          hero_from_hex: string | null
+          hero_style: string
+          hero_to_hex: string | null
           id: string
           is_base: boolean
           logo_url: string | null
@@ -392,6 +397,7 @@ export type Database = {
           secondary_hex: string
           settings: Json
           slug: string
+          tiles_per_row: number
           updated_at: string
           visibility: string
         }
@@ -401,6 +407,11 @@ export type Database = {
           created_at?: string
           favicon_url?: string | null
           font_family?: string | null
+          heading_font?: string | null
+          hero_angle?: number
+          hero_from_hex?: string | null
+          hero_style?: string
+          hero_to_hex?: string | null
           id?: string
           is_base?: boolean
           logo_url?: string | null
@@ -409,6 +420,7 @@ export type Database = {
           secondary_hex?: string
           settings?: Json
           slug: string
+          tiles_per_row?: number
           updated_at?: string
           visibility?: string
         }
@@ -418,6 +430,11 @@ export type Database = {
           created_at?: string
           favicon_url?: string | null
           font_family?: string | null
+          heading_font?: string | null
+          hero_angle?: number
+          hero_from_hex?: string | null
+          hero_style?: string
+          hero_to_hex?: string | null
           id?: string
           is_base?: boolean
           logo_url?: string | null
@@ -426,6 +443,7 @@ export type Database = {
           secondary_hex?: string
           settings?: Json
           slug?: string
+          tiles_per_row?: number
           updated_at?: string
           visibility?: string
         }

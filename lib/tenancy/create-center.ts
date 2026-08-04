@@ -1,12 +1,10 @@
 import { serviceClient } from '@/lib/db/client'
 import { slugify } from '@/lib/content/slug'
 import { assertHex } from '@/lib/tenancy/color'
+import { RESERVED_SLUGS } from './reserved-slugs'
+import { toAppearanceColumns, type AppearanceInput } from './appearance'
 
-const RESERVED_SLUGS = new Set([
-  'www', 'api', 'admin', 'a', 'search', 'login', 'auth', 'assets', 'ops',
-])
-
-export type CreateHelpCenterInput = {
+export type CreateHelpCenterInput = Partial<AppearanceInput> & {
   name: string
   slug: string
   primaryHex: string
@@ -36,6 +34,7 @@ export async function createBrandedHelpCenter(input: CreateHelpCenterInput): Pro
   assertHex(input.primaryHex, 'Primary color')
   assertHex(input.secondaryHex, 'Secondary color')
 
+  const appearance = toAppearanceColumns(input)
   const db = serviceClient()
 
   const { data: existing, error: existingError } = await db
@@ -76,6 +75,7 @@ export async function createBrandedHelpCenter(input: CreateHelpCenterInput): Pro
       visibility: 'public',
       auto_include_new_articles: true,
       settings,
+      ...appearance,
     })
     .select('id, slug')
     .single()

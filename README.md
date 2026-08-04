@@ -47,3 +47,24 @@ pnpm db:reset && pnpm test:e2e   # Playwright; starts its own dev server on port
 ```
 
 The e2e suite is not idempotent: it needs a fresh `pnpm db:reset` plus the owner membership grant above before each run.
+
+Public reads are cached across requests (`lib/content/cached.ts`, `lib/tenancy/active.ts`).
+Mutations bust their tags, so the admin UI is always current — but a write that bypasses
+the app, including `pnpm db:reset` and the `ops:*` scripts, is invisible until the TTL
+expires. Clear the data cache after one:
+
+```bash
+rm -rf .next/dev/cache .next/cache
+```
+
+## Deployment
+
+Serverless functions are pinned to `syd1` in `vercel.json` to sit in the same region as the
+Supabase project (`ap-southeast-2`). Without that they default to `iad1`, and every query
+crosses the Pacific — which cost roughly 7 seconds on a collection page. Verify with:
+
+```bash
+curl -sD - -o /dev/null https://<deployment>/ | grep x-vercel-id
+```
+
+The two segments are the edge PoP and the function region; they should both be `syd1`.

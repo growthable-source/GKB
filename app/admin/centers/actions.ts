@@ -5,9 +5,12 @@ import { redirect } from 'next/navigation'
 import { BRAND_TAG } from '@/lib/cache/tags'
 import { authorize } from '@/lib/authz/authorize'
 import { createBrandedHelpCenter } from '@/lib/tenancy/create-center'
+import { updateHelpCenter } from '@/lib/tenancy/update-center'
+import { readAppearanceForm } from '@/lib/tenancy/appearance'
 import { DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 
 export type CreateHelpCenterState = { error?: string }
+export type EditHelpCenterState = { error?: string; saved?: boolean }
 
 export async function createHelpCenter(
   _prev: CreateHelpCenterState | null,
@@ -39,6 +42,7 @@ export async function createHelpCenter(
       faviconUrl,
       headline,
       subtitle,
+      ...readAppearanceForm(formData),
     })
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not create help center.' }
@@ -50,4 +54,40 @@ export async function createHelpCenter(
   updateTag(BRAND_TAG)
   revalidatePath('/admin/centers')
   redirect(`/admin/centers?created=${created.slug}`)
+}
+
+export async function editHelpCenter(
+  _prev: EditHelpCenterState | null,
+  formData: FormData,
+): Promise<EditHelpCenterState> {
+  await authorize('helpCenter.update', {})
+
+  const id = String(formData.get('id') ?? '')
+  if (!id) return { error: 'Missing help center id.' }
+
+  const text = (key: string) => String(formData.get(key) ?? '').trim()
+
+  try {
+    await updateHelpCenter({
+      id,
+      name: text('name'),
+      slug: text('slug'),
+      primaryHex: text('primaryHex') || DEFAULT_PRIMARY_HEX,
+      secondaryHex: text('secondaryHex') || DEFAULT_SECONDARY_HEX,
+      logoUrl: text('logoUrl') || undefined,
+      faviconUrl: text('faviconUrl') || undefined,
+      headline: text('headline') || undefined,
+      subtitle: text('subtitle') || undefined,
+      ...readAppearanceForm(formData),
+    })
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save help center.' }
+  }
+
+  // Brand resolution is cached by hostname and slug (lib/tenancy/active.ts), so
+  // a rename or a colour change is invisible until this tag is busted.
+  updateTag(BRAND_TAG)
+  revalidatePath('/admin/centers')
+  revalidatePath('/', 'layout')
+  return { saved: true }
 }

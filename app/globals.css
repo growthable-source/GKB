@@ -30,6 +30,23 @@ body {
    these rules only ever apply them as low-strength tints or borders, never
    as full-strength backgrounds or body text, so an arbitrary tenant hex
    stays safe on a white page. */
+/* Headings take the center's heading font; body text inherits --hc-font-body
+   from the inline style on .hc-theme. Both fall back to the app default when a
+   center has chosen nothing (see fontStack). */
+.hc-theme h1,
+.hc-theme h2,
+.hc-theme h3 {
+  font-family: var(--hc-font-heading);
+}
+
+/* The one place a tenant colour is used at full strength behind text. The
+   foreground is derived from the background's luminance rather than stored, so
+   a pale brand colour cannot produce white-on-white — see heroForeground. */
+.hc-theme .hc-hero {
+  background: var(--hc-hero-bg);
+  color: var(--hc-hero-fg);
+}
+
 .hc-theme mark {
   background-color: color-mix(in srgb, var(--hc-primary) 18%, transparent);
   color: inherit;

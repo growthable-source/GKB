@@ -52,6 +52,37 @@ export async function createCollection(formData: FormData): Promise<void> {
   revalidatePath('/')
 }
 
+/**
+ * Accepts one emoji, or empty to clear it. Grapheme-segmented rather than
+ * length-checked, because a single emoji is routinely several code units
+ * ("👩‍💻" is 5) — `.length <= 2` would reject valid input and allow "ab".
+ */
+function parseEmoji(raw: string): string | null {
+  const value = raw.trim()
+  if (!value) return null
+
+  const graphemes = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)]
+  if (graphemes.length !== 1) throw new Error('Use a single emoji, or leave it empty.')
+  if (!/\p{Extended_Pictographic}/u.test(value)) throw new Error('That is not an emoji.')
+
+  return value
+}
+
+export async function updateCollection(formData: FormData): Promise<void> {
+  await authorize('collection.update', { helpCenterId: await getBaseHelpCenterId() })
+
+  const id = String(formData.get('id') ?? '')
+  const icon = parseEmoji(String(formData.get('icon') ?? ''))
+
+  const { error } = await serviceClient().from('collections').update({ icon }).eq('id', id)
+  if (error) throw new Error(`Could not update collection: ${error.message}`)
+
+  // Public collection lists are cached under this tag (lib/content/cached.ts).
+  updateTag(CONTENT_COLLECTIONS_TAG)
+  revalidatePath('/admin/collections')
+  revalidatePath('/')
+}
+
 export async function deleteCollection(formData: FormData): Promise<void> {
   await authorize('collection.delete', { helpCenterId: await getBaseHelpCenterId() })
 

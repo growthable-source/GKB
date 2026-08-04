@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { slugify } from '@/lib/content/slug'
+import { AppearanceFields, APPEARANCE_DEFAULTS } from './appearance-fields'
 import type { CreateHelpCenterState } from '@/app/admin/centers/actions'
 
 type Props = {
@@ -130,26 +131,7 @@ export function CreateCenterForm({ action }: Props) {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex items-center gap-2 text-sm text-neutral-600">
-          Primary color
-          <input
-            type="color"
-            name="primaryHex"
-            defaultValue="#1f6feb"
-            className="h-9 w-16 rounded border border-neutral-300"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm text-neutral-600">
-          Secondary color
-          <input
-            type="color"
-            name="secondaryHex"
-            defaultValue="#6e7781"
-            className="h-9 w-16 rounded border border-neutral-300"
-          />
-        </label>
-      </div>
+      <AppearanceFields defaults={APPEARANCE_DEFAULTS} />
 
       <BrandingUploadField
         label="Logo"

@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache'
 import { headers } from 'next/headers'
 import { serviceClient } from '@/lib/db/client'
 import { BRAND_TAG, BRAND_TTL_SECONDS } from '@/lib/cache/tags'
+import { parseHeroStyle } from './theme'
 
 export type ActiveHelpCenter = {
   id: string
@@ -14,12 +15,23 @@ export type ActiveHelpCenter = {
   faviconUrl: string | null
   visibility: 'public' | 'authenticated'
   settings: { headline?: string; subtitle?: string }
+  // Appearance. See lib/tenancy/theme.ts for how these resolve, and
+  // lib/fonts/catalog.ts for what the font keys mean.
+  heroStyle: 'solid' | 'gradient'
+  heroFromHex: string | null
+  heroToHex: string | null
+  heroAngle: number
+  bodyFont: string | null
+  headingFont: string | null
+  tilesPerRow: number
 }
 
 const VALID_VISIBILITIES = ['public', 'authenticated'] as const
 
+// One string literal, not a concatenation: supabase-js infers the row type by
+// parsing this at the type level, and a computed string degrades it to an error type.
 const HELP_CENTER_FIELDS =
-  'id, slug, name, primary_hex, secondary_hex, logo_url, favicon_url, visibility, settings'
+  'id, slug, name, primary_hex, secondary_hex, logo_url, favicon_url, visibility, settings, hero_style, hero_from_hex, hero_to_hex, hero_angle, font_family, heading_font, tiles_per_row'
 
 type HelpCenterRow = {
   id: string
@@ -31,6 +43,13 @@ type HelpCenterRow = {
   favicon_url: string | null
   visibility: string
   settings: unknown
+  hero_style: string
+  hero_from_hex: string | null
+  hero_to_hex: string | null
+  hero_angle: number
+  font_family: string | null
+  heading_font: string | null
+  tiles_per_row: number
 }
 
 /**
@@ -58,6 +77,13 @@ function toActiveHelpCenter(row: HelpCenterRow): ActiveHelpCenter {
     faviconUrl: row.favicon_url,
     visibility: parseVisibility(row.visibility),
     settings: (row.settings ?? {}) as ActiveHelpCenter['settings'],
+    heroStyle: parseHeroStyle(row.hero_style),
+    heroFromHex: row.hero_from_hex,
+    heroToHex: row.hero_to_hex,
+    heroAngle: row.hero_angle,
+    bodyFont: row.font_family,
+    headingFont: row.heading_font,
+    tilesPerRow: row.tiles_per_row,
   }
 }
 

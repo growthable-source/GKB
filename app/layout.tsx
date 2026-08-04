@@ -1,17 +1,7 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { getActiveHelpCenter } from "@/lib/tenancy/active";
+import { ALL_FONT_VARIABLE_CLASSES } from "@/lib/fonts/catalog";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   const helpCenter = await getActiveHelpCenter();
@@ -29,9 +19,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // Every catalog font's variable class is applied here, which only DECLARES
+    // the custom properties — a family is downloaded when a rule references it,
+    // so a visitor fetches only the font their help center chose. See
+    // lib/fonts/catalog.ts.
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${ALL_FONT_VARIABLE_CLASSES} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

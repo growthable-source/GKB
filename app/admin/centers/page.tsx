@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { serviceClient } from '@/lib/db/client'
 import { CreateCenterForm } from '@/components/admin/create-center-form'
 import { getBaseHelpCenterId } from '@/lib/tenancy/active'
@@ -81,7 +82,9 @@ export default async function CentersPage({
               )}
               <div>
                 <p className="flex items-center gap-2 font-medium">
-                  {center.name}
+                  <Link href={`/admin/centers/${center.id}`} className="hover:underline">
+                    {center.name}
+                  </Link>
                   {center.is_base && (
                     <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-medium text-white">
                       BASE
