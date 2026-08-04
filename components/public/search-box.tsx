@@ -92,14 +92,19 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
         aria-activedescendant={
           open && hits.length > 0 ? `search-box-option-${hits[active]?.articleId}` : undefined
         }
-        className="hc-search-input w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-base shadow-sm focus:outline-none"
+        // text-neutral-900 is not redundant: this sits inside the hero, which
+        // sets `color` for its own light-on-dark text. Without an explicit
+        // colour the input inherits it and types white on its white background.
+        className="hc-search-input w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-base text-neutral-900 shadow-sm focus:outline-none"
       />
 
       {open && hits.length > 0 && (
         <ul
           id="search-box-listbox"
           role="listbox"
-          className="absolute z-10 mt-2 w-full overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg"
+          // Same reason as the input above: white panel, inside a hero that has
+          // set an inherited colour.
+          className="absolute z-10 mt-2 w-full overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-lg"
         >
           {hits.map((hit, index) => (
             <li key={hit.articleId} id={`search-box-option-${hit.articleId}`} role="option" aria-selected={index === active}>
