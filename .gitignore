@@ -50,3 +50,6 @@ supabase/.branches
 /test-results
 /playwright-report
 /import
+
+# Visual brainstorming companion mockups
+.superpowers/
