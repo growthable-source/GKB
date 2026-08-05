@@ -29,7 +29,9 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new EmailNotConfiguredError()
 
-  const from = process.env.RESEND_FROM ?? 'Growthable <help@growthable.io>'
+  // news.growthable.io is the domain verified in Resend. The default matters:
+  // an address on any other domain is refused at send time.
+  const from = process.env.RESEND_FROM ?? 'Ryan from Growthable <ryan@news.growthable.io>'
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
