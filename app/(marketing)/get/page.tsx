@@ -3,6 +3,12 @@ import { getCachedArticleCollectionIndex, getCachedCollections } from '@/lib/con
 import { countArticlesPerCollection } from '@/lib/content/queries'
 import { StartForm } from '@/components/marketing/start-form'
 
+// Every other page in this app is dynamic because it reads headers(). This one
+// does not, so Next would prerender it at build time — where there is no
+// database, and where the article count would freeze at whatever it was when
+// the deployment was cut. The count is the page's central claim; it stays live.
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Get your own help centre — Growthable',
   description:
