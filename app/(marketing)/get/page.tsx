@@ -77,10 +77,12 @@ export default async function GetPage() {
       <section className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-20">
         <div className="grid items-start gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
           <div className="flex flex-col gap-6">
-            <p className="mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-brass)]">
+            <p className="mk-eyebrow mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
               Built for SaaS-mode agencies
             </p>
-            <h1 className="text-4xl leading-[1.03] tracking-tight sm:text-5xl lg:text-6xl">
+            {/* 3.4rem is growthable.io's own hero size, measured rather than
+                guessed — anything larger breaks this headline mid-clause. */}
+            <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem]">
               Your clients ask the same questions.{' '}
               <span className="text-[color:var(--mk-accent)]">The answers are already written.</span>
             </h1>
@@ -91,7 +93,7 @@ export default async function GetPage() {
             <StartForm />
           </div>
 
-          <aside className="flex flex-col gap-4 rounded-sm border border-[color:var(--mk-rule)] bg-[color:var(--mk-surface)] p-6 sm:p-7">
+          <aside className="flex flex-col gap-4 rounded-lg border border-[color:var(--mk-rule)] bg-[color:var(--mk-surface)] p-6 sm:p-7">
             <div className="flex items-baseline justify-between gap-4 border-b border-[color:var(--mk-rule)] pb-3">
               <h2 className="text-xl">What&rsquo;s already inside</h2>
               <span className="mk-mono text-xs text-[color:var(--mk-ink-faint)]">updated weekly</span>
@@ -136,7 +138,7 @@ export default async function GetPage() {
 
       <section className="border-t border-[color:var(--mk-rule)]">
         <div className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-16">
-          <p className="mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-brass)]">
+          <p className="mk-eyebrow mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
             Four steps, about two minutes
           </p>
           <h2 className="mt-2 text-2xl tracking-tight sm:text-3xl">
@@ -149,7 +151,7 @@ export default async function GetPage() {
                 key={step.title}
                 className="flex flex-col gap-2 border-t-2 border-[color:var(--mk-accent)] pt-3"
               >
-                <span className="mk-mono text-xs tracking-[0.1em] text-[color:var(--mk-brass)]">
+                <span className="mk-mono text-xs tracking-[0.1em] text-[color:var(--mk-accent)]">
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <h3 className="text-base font-medium">{step.title}</h3>
@@ -162,7 +164,7 @@ export default async function GetPage() {
 
       <section className="border-t border-[color:var(--mk-rule)]">
         <div className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-16">
-          <p className="mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-brass)]">
+          <p className="mk-eyebrow mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
             The specifics
           </p>
           <h2 className="mt-2 text-2xl tracking-tight sm:text-3xl">What you get, precisely</h2>
@@ -197,7 +199,7 @@ export default async function GetPage() {
 
       <section className="border-t border-[color:var(--mk-rule)]">
         <div className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-16">
-          <p className="mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-brass)]">
+          <p className="mk-eyebrow mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
             Before you ask
           </p>
           <h2 className="mt-2 text-2xl tracking-tight sm:text-3xl">Reasonable questions</h2>

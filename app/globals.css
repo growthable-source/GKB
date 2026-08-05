@@ -33,28 +33,63 @@ body {
 .mk {
   background: var(--mk-paper);
   color: var(--mk-ink);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+  font-family: var(--font-poppins), system-ui, sans-serif;
 }
 
+/* Growthable's headline treatment: Poppins at 800 with tight negative tracking,
+   set on the navy rather than the body ink. Measured off growthable.io so the
+   signup funnel reads as the same site, not a lookalike. */
 .mk h1,
 .mk h2,
 .mk h3,
 .mk .mk-display {
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  font-weight: 400;
+  font-family: var(--font-poppins), system-ui, sans-serif;
+  color: var(--mk-heading);
+  letter-spacing: -0.025em;
   text-wrap: balance;
 }
 
-.mk .mk-mono {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+.mk h1,
+.mk .mk-display {
+  font-weight: 800;
+  line-height: 1.08;
 }
 
-/* A table-of-contents leader: the dotted run between a category and its count.
-   Nudged up so it sits on the text baseline rather than under the descenders. */
+.mk h2 {
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.mk h3 {
+  font-weight: 600;
+}
+
+.mk .mk-mono {
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
+}
+
+/* The eyebrow rule: a short accent dash that precedes every section label on
+   growthable.io. Drawn here rather than repeated as markup in every section. */
+.mk .mk-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.mk .mk-eyebrow::before {
+  content: "";
+  width: 1.6rem;
+  height: 2px;
+  background: var(--mk-accent);
+  flex: none;
+}
+
+/* The run between a category and its article count. Solid rather than dotted:
+   a dotted leader is a bookish device, and this page is set in Poppins. */
 .mk .mk-leader {
   flex: 1;
-  border-bottom: 1px dotted var(--mk-rule-strong);
-  transform: translateY(-0.28em);
+  border-bottom: 1px solid var(--mk-rule);
+  transform: translateY(-0.25em);
 }
 
 /* Per-help-center accents, scoped to the public layout's .hc-theme wrapper.

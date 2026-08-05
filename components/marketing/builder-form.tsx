@@ -21,7 +21,7 @@ type Defaults = {
 }
 
 const FIELD =
-  'w-full rounded-sm border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] px-3 py-2.5 text-sm text-[color:var(--mk-ink)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--mk-accent)]'
+  'w-full rounded-lg border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] px-3 py-2.5 text-sm text-[color:var(--mk-ink)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--mk-accent)]'
 const LABEL = 'text-xs text-[color:var(--mk-ink-soft)]'
 
 export function BuilderForm({
@@ -126,7 +126,7 @@ export function BuilderForm({
 
         <div className="flex flex-col gap-1.5">
           <span className={LABEL}>Address</span>
-          <div className="flex items-center gap-1.5 rounded-sm border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] px-3 py-2.5 focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[color:var(--mk-accent)]">
+          <div className="flex items-center gap-1.5 rounded-lg border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] px-3 py-2.5 focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[color:var(--mk-accent)]">
             <span className="mk-mono text-sm text-[color:var(--mk-ink-faint)]">/hc/</span>
             <input
               name="slug"
@@ -144,7 +144,7 @@ export function BuilderForm({
             <span
               className={`text-xs ${
                 availability.available
-                  ? 'text-[color:var(--mk-brass)]'
+                  ? 'text-[color:var(--mk-heading)]'
                   : 'text-[color:var(--mk-accent)]'
               }`}
             >
@@ -173,7 +173,7 @@ export function BuilderForm({
                 <img
                   src={logoUrl}
                   alt="Your logo"
-                  className="h-10 w-10 rounded-sm border border-[color:var(--mk-rule)] object-contain"
+                  className="h-10 w-10 rounded-lg border border-[color:var(--mk-rule)] object-contain"
                 />
                 <button
                   type="button"
@@ -184,7 +184,7 @@ export function BuilderForm({
                 </button>
               </>
             ) : (
-              <label className="w-fit cursor-pointer rounded-sm border border-[color:var(--mk-rule-strong)] px-3 py-2 text-sm">
+              <label className="w-fit cursor-pointer rounded-lg border border-[color:var(--mk-rule-strong)] px-3 py-2 text-sm">
                 {uploading ? 'Uploading…' : 'Upload a logo'}
                 <input
                   type="file"
@@ -209,7 +209,7 @@ export function BuilderForm({
               type="color"
               value={primary}
               onChange={(event) => setPrimary(event.target.value)}
-              className="h-10 w-full cursor-pointer rounded-sm border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)]"
+              className="h-10 w-full cursor-pointer rounded-lg border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)]"
             />
           </label>
           <label className="flex flex-col gap-1.5">
@@ -218,7 +218,7 @@ export function BuilderForm({
               type="color"
               value={secondary}
               onChange={(event) => setSecondary(event.target.value)}
-              className="h-10 w-full cursor-pointer rounded-sm border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)]"
+              className="h-10 w-full cursor-pointer rounded-lg border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)]"
             />
           </label>
         </div>
@@ -231,7 +231,7 @@ export function BuilderForm({
                 key={style}
                 type="button"
                 onClick={() => setHeroStyle(style)}
-                className={`cursor-pointer rounded-sm border px-3 py-2 text-sm capitalize ${
+                className={`cursor-pointer rounded-lg border px-3 py-2 text-sm capitalize ${
                   heroStyle === style
                     ? 'border-[color:var(--mk-accent)] text-[color:var(--mk-accent)]'
                     : 'border-[color:var(--mk-rule-strong)] text-[color:var(--mk-ink-soft)]'
@@ -296,7 +296,7 @@ export function BuilderForm({
         <button
           type="submit"
           disabled={pending || uploading || availability?.available === false}
-          className="mt-1 cursor-pointer rounded-sm bg-[color:var(--mk-accent)] px-5 py-3 font-medium text-[color:var(--mk-on-accent)] transition-colors hover:bg-[color:var(--mk-accent-hover)] disabled:opacity-50"
+          className="mt-1 cursor-pointer rounded-lg bg-[color:var(--mk-accent)] px-5 py-3 font-medium text-[color:var(--mk-on-accent)] transition-colors hover:bg-[color:var(--mk-accent-hover)] disabled:opacity-50"
         >
           {pending ? 'Sending your link…' : 'Confirm my email and go live'}
         </button>
@@ -311,7 +311,7 @@ export function BuilderForm({
         </span>
 
         <div
-          className="overflow-hidden rounded-sm border border-[color:var(--mk-rule)] bg-white"
+          className="overflow-hidden rounded-lg border border-[color:var(--mk-rule)] bg-white"
           style={{ fontFamily: fontStack(bodyFont || null) }}
         >
           <div className="flex items-center gap-2 border-b border-neutral-200 px-5 py-3.5">

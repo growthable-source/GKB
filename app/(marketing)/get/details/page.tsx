@@ -13,7 +13,7 @@ export default async function DetailsPage({
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-7 px-5 py-16 sm:px-8 sm:py-24">
       <div className="flex flex-col gap-2">
-        <p className="mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-brass)]">
+        <p className="mk-eyebrow mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
           Step 1 of 7
         </p>
         <h1 className="text-3xl tracking-tight sm:text-4xl">First, who are you?</h1>

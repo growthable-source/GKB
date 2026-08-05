@@ -9,17 +9,22 @@ import Link from 'next/link'
  * declarative and this file remains the single source of the colours.
  */
 const PALETTE = {
-  '--mk-paper': '#f2efee',
-  '--mk-surface': '#fbfaf9',
-  '--mk-ink': '#1a1416',
-  '--mk-ink-soft': '#5c4f52',
-  '--mk-ink-faint': '#8b7c7f',
-  '--mk-rule': '#d8cfcf',
-  '--mk-rule-strong': '#b9abac',
-  '--mk-accent': '#7c2230',
-  '--mk-accent-hover': '#5e1723',
-  '--mk-brass': '#9a7c42',
-  '--mk-on-accent': '#fbf6f2',
+  // Measured off growthable.io, so the funnel is the same brand rather than a
+  // near miss: warm off-white page, navy headings, the pink CTA, and the blush
+  // tint used behind accented blocks.
+  '--mk-paper': '#fbfaf8',
+  '--mk-surface': '#ffffff',
+  '--mk-surface-alt': '#f2f1ed',
+  '--mk-tint': '#fdedf1',
+  '--mk-heading': '#34475b',
+  '--mk-ink': '#25313d',
+  '--mk-ink-soft': '#5b6875',
+  '--mk-ink-faint': '#8b949e',
+  '--mk-rule': '#e4e2dc',
+  '--mk-rule-strong': '#cfccc4',
+  '--mk-accent': '#f03e6a',
+  '--mk-accent-hover': '#d62d56',
+  '--mk-on-accent': '#ffffff',
 } as React.CSSProperties
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {

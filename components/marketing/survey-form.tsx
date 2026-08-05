@@ -5,7 +5,7 @@ import type { SurveyStep } from '@/lib/signup/survey'
 import type { FunnelState } from '@/app/(marketing)/get/actions'
 
 const BUTTON =
-  'cursor-pointer rounded-sm bg-[color:var(--mk-accent)] px-5 py-3 font-medium text-[color:var(--mk-on-accent)] transition-colors hover:bg-[color:var(--mk-accent-hover)] disabled:opacity-50'
+  'cursor-pointer rounded-lg bg-[color:var(--mk-accent)] px-5 py-3 font-medium text-[color:var(--mk-on-accent)] transition-colors hover:bg-[color:var(--mk-accent-hover)] disabled:opacity-50'
 
 /**
  * One question, one screen.
@@ -41,7 +41,7 @@ export function SurveyForm({
                 type="submit"
                 disabled={pending}
                 onClick={() => setChoice(option)}
-                className={`flex cursor-pointer items-center gap-3 rounded-sm border px-4 py-3 text-left transition-colors disabled:opacity-60 ${
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors disabled:opacity-60 ${
                   choice === option
                     ? 'border-[color:var(--mk-accent)] bg-[color:var(--mk-surface)]'
                     : 'border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] hover:border-[color:var(--mk-accent)]'
@@ -69,7 +69,7 @@ export function SurveyForm({
             defaultValue={existing ?? ''}
             autoFocus
             placeholder={step.placeholder}
-            className="w-full rounded-sm border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] px-3.5 py-3 text-[color:var(--mk-ink)] placeholder:text-[color:var(--mk-ink-faint)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--mk-accent)]"
+            className="w-full rounded-lg border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] px-3.5 py-3 text-[color:var(--mk-ink)] placeholder:text-[color:var(--mk-ink-faint)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--mk-accent)]"
           />
           <button type="submit" disabled={pending} className={`${BUTTON} w-fit`}>
             {pending ? 'Saving…' : 'Continue'}
@@ -79,7 +79,7 @@ export function SurveyForm({
 
       {step.kind === 'consent' && (
         <>
-          <label className="flex items-start gap-3 rounded-sm border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] p-4">
+          <label className="flex items-start gap-3 rounded-lg border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] p-4">
             <input
               type="checkbox"
               name="answer"

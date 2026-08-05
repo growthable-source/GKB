@@ -12,7 +12,7 @@ export default async function CheckEmailPage() {
 
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-5 px-5 py-16 sm:px-8 sm:py-24">
-      <p className="mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-brass)]">
+      <p className="mk-eyebrow mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
         Almost there
       </p>
       <h1 className="text-3xl tracking-tight sm:text-4xl">One click left.</h1>

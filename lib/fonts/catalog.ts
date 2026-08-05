@@ -5,6 +5,7 @@ import {
   Geist,
   Geist_Mono,
   Instrument_Serif,
+  IBM_Plex_Mono,
   Inter,
   JetBrains_Mono,
   Lora,
@@ -52,7 +53,10 @@ const workSans = Work_Sans({ subsets: ['latin'], display: 'swap', preload: false
 const figtree = Figtree({ subsets: ['latin'], display: 'swap', preload: false, variable: '--font-figtree' })
 const dmSans = DM_Sans({ subsets: ['latin'], display: 'swap', preload: false, variable: '--font-dm-sans' })
 const outfit = Outfit({ subsets: ['latin'], display: 'swap', preload: false, variable: '--font-outfit' })
-const poppins = Poppins({ subsets: ['latin'], display: 'swap', preload: false, weight: ['400', '500', '600', '700'], variable: '--font-poppins' })
+// 800 is here for the marketing site, which sets its headlines at Growthable's
+// own weight. A center that picks Poppins is unaffected — extra weights are
+// only fetched when a rule asks for one.
+const poppins = Poppins({ subsets: ['latin'], display: 'swap', preload: false, weight: ['400', '500', '600', '700', '800'], variable: '--font-poppins' })
 const sora = Sora({ subsets: ['latin'], display: 'swap', preload: false, variable: '--font-sora' })
 const plusJakarta = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', preload: false, variable: '--font-plus-jakarta' })
 const nunito = Nunito({ subsets: ['latin'], display: 'swap', preload: false, variable: '--font-nunito' })
@@ -65,6 +69,11 @@ const sourceSerif = Source_Serif_4({ subsets: ['latin'], display: 'swap', preloa
 const merriweather = Merriweather({ subsets: ['latin'], display: 'swap', preload: false, weight: ['400', '700'], variable: '--font-merriweather' })
 const instrumentSerif = Instrument_Serif({ subsets: ['latin'], display: 'swap', preload: false, weight: ['400'], variable: '--font-instrument-serif' })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', preload: false, variable: '--font-jetbrains-mono' })
+
+// Growthable's own mono, used for eyebrows and figures on the marketing site.
+// Deliberately absent from FONT_OPTIONS in ./options.ts: it is the marketing
+// brand's face, not one a customer's help center gets to pick.
+const ibmPlexMono = IBM_Plex_Mono({ subsets: ['latin'], display: 'swap', preload: false, weight: ['400', '500'], variable: '--font-ibm-plex-mono' })
 
 /**
  * Every variable class, for <html>. Declares the custom properties named in
@@ -91,4 +100,5 @@ export const ALL_FONT_VARIABLE_CLASSES = [
   merriweather.variable,
   instrumentSerif.variable,
   jetbrainsMono.variable,
+  ibmPlexMono.variable,
 ].join(' ')

@@ -31,7 +31,9 @@ export default async function SurveyStepPage({
     <main className="mx-auto flex max-w-xl flex-col gap-7 px-5 py-16 sm:px-8 sm:py-24">
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <p className="mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-brass)]">
+          {/* No mk-eyebrow here: the progress rule beside it already carries
+              the accent dash, and two in a row read as a mistake. */}
+          <p className="mk-mono text-xs whitespace-nowrap uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
             Step {position + 1} of 7
           </p>
           <div

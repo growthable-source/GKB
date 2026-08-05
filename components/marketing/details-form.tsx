@@ -5,7 +5,7 @@ import { isWorkEmail } from '@/lib/signup/work-email'
 import type { FunnelState } from '@/app/(marketing)/get/actions'
 
 const FIELD =
-  'w-full rounded-sm border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] px-3.5 py-3 text-[color:var(--mk-ink)] placeholder:text-[color:var(--mk-ink-faint)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--mk-accent)]'
+  'w-full rounded-lg border border-[color:var(--mk-rule-strong)] bg-[color:var(--mk-surface)] px-3.5 py-3 text-[color:var(--mk-ink)] placeholder:text-[color:var(--mk-ink-faint)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--mk-accent)]'
 
 export function DetailsForm({
   action,
@@ -54,7 +54,7 @@ export function DetailsForm({
       <button
         type="submit"
         disabled={pending}
-        className="mt-1 w-fit cursor-pointer rounded-sm bg-[color:var(--mk-accent)] px-5 py-3 font-medium text-[color:var(--mk-on-accent)] transition-colors hover:bg-[color:var(--mk-accent-hover)] disabled:opacity-50"
+        className="mt-1 w-fit cursor-pointer rounded-lg bg-[color:var(--mk-accent)] px-5 py-3 font-medium text-[color:var(--mk-on-accent)] transition-colors hover:bg-[color:var(--mk-accent-hover)] disabled:opacity-50"
       >
         {pending ? 'One moment…' : 'Continue'}
       </button>
