@@ -7,6 +7,7 @@ import { readSignupToken, writeSignupToken } from '@/lib/signup/session'
 import { findSignupByToken, startSignup, updateSignup } from '@/lib/signup/repository'
 import { findSurveyStep, nextSurveyStepId } from '@/lib/signup/survey'
 import { checkSlugAvailable } from '@/lib/signup/slug-availability'
+import { requestOrigin } from '@/lib/signup/origin'
 import { readAppearanceForm } from '@/lib/tenancy/appearance'
 import { DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 import { safeHex } from '@/lib/tenancy/color'
@@ -112,7 +113,8 @@ export async function submitBuild(
   const { error } = await supabase.auth.signInWithOtp({
     email: signup.email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/confirm`,
+      // The host they are on, not a build-time constant — see requestOrigin().
+      emailRedirectTo: `${await requestOrigin()}/auth/confirm`,
     },
   })
   if (error) return { error: `We could not send your confirmation email: ${error.message}` }
