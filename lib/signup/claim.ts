@@ -48,7 +48,11 @@ async function existingCenterFor(userId: string): Promise<{ slug: string } | nul
  * notice. Both are fixable in the dashboard in ten seconds. Neither is worth
  * losing a signup over.
  */
-export async function claimSignup(userId: string, email: string): Promise<ClaimOutcome> {
+export async function claimSignup(
+  userId: string,
+  email: string,
+  origin?: string,
+): Promise<ClaimOutcome> {
   const owned = await existingCenterFor(userId)
   if (owned) return { kind: 'already-owns-center', slug: owned.slug }
 
@@ -118,9 +122,10 @@ export async function claimSignup(userId: string, email: string): Promise<ClaimO
   // rather than letting the brand TTL serve a stale miss at the owner.
   revalidateTag(BRAND_TAG, { expire: 0 })
 
-  // Deliberately not awaited into the redirect path: a slow CRM must not hold
-  // up the one screen this whole funnel exists to reach.
-  void deliverSignup(finished as Signup)
+  // Second delivery: upserts the same lead, now carrying the live centre. Not
+  // fired and forgotten — a serverless function can be torn down as soon as it
+  // responds, and a dangling promise dies with it. deliverSignup never throws.
+  await deliverSignup(finished as Signup, origin)
 
   return {
     kind: 'claimed',

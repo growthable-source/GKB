@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { userClient } from '@/lib/db/client'
 import { claimSignup } from '@/lib/signup/claim'
+import { requestOrigin } from '@/lib/signup/origin'
 
 /**
  * The last step: a verified session becomes a live help center.
@@ -17,7 +18,7 @@ export async function GET() {
 
   if (!data.user || !email) redirect('/login?next=/get/claim')
 
-  const outcome = await claimSignup(data.user.id, email)
+  const outcome = await claimSignup(data.user.id, email, await requestOrigin())
 
   if (outcome.kind === 'no-signup') redirect('/get/details')
 

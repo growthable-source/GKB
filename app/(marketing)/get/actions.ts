@@ -8,6 +8,7 @@ import { findSurveyStep, nextSurveyStepId } from '@/lib/signup/survey'
 import { checkSlugAvailable } from '@/lib/signup/slug-availability'
 import { requestOrigin } from '@/lib/signup/origin'
 import { sendConfirmationLink } from '@/lib/signup/send-link'
+import { deliverSignup } from '@/lib/signup/deliver'
 import { readAppearanceForm } from '@/lib/tenancy/appearance'
 import { DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 import { safeHex } from '@/lib/tenancy/color'
@@ -53,11 +54,19 @@ export async function submitSurveyStep(
     if (raw !== 'on' && raw !== 'true') {
       return { error: 'The mailing list is part of what makes this free.' }
     }
-    await updateSignup(signup.id, {
+    const surveyed = await updateSignup(signup.id, {
       marketing_opt_in: true,
       consented_at: new Date().toISOString(),
       step: 'build',
     })
+
+    // The survey is complete here, so this is the earliest point the CRM can be
+    // told everything. Sending now rather than at claim is what makes someone
+    // who abandons the builder a lead instead of an orphaned row. Awaited, not
+    // fired and forgotten: a serverless function can be torn down the moment it
+    // responds, taking a dangling promise with it. deliverSignup never throws.
+    await deliverSignup(surveyed, await requestOrigin())
+
     redirect('/get/build')
   }
 
