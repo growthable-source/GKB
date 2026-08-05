@@ -1,13 +1,13 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { userClient } from '@/lib/db/client'
 import { checkWorkEmail } from '@/lib/signup/work-email'
 import { readSignupToken, writeSignupToken } from '@/lib/signup/session'
 import { findSignupByToken, startSignup, updateSignup } from '@/lib/signup/repository'
 import { findSurveyStep, nextSurveyStepId } from '@/lib/signup/survey'
 import { checkSlugAvailable } from '@/lib/signup/slug-availability'
 import { requestOrigin } from '@/lib/signup/origin'
+import { sendConfirmationLink } from '@/lib/signup/send-link'
 import { readAppearanceForm } from '@/lib/tenancy/appearance'
 import { DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 import { safeHex } from '@/lib/tenancy/color'
@@ -63,6 +63,14 @@ export async function submitSurveyStep(
 
   if (!raw) return { error: 'Pick an answer to carry on.' }
 
+  // A choice step accepts only what it offered. The answer arrives in a hidden
+  // field the buttons populate, so anything else means the post did not come
+  // from this screen — and survey answers are the segmentation the funnel
+  // exists to collect, so junk in this column is worse than a rejected submit.
+  if (step.kind === 'choice' && !step.options?.includes(raw)) {
+    return { error: 'Pick one of the options to carry on.' }
+  }
+
   const nextStep = nextSurveyStepId(step.id)
   await updateSignup(signup.id, {
     [step.column]: raw,
@@ -109,15 +117,11 @@ export async function submitBuild(
     step: 'claim',
   })
 
-  const supabase = await userClient()
-  const { error } = await supabase.auth.signInWithOtp({
-    email: signup.email,
-    options: {
-      // The host they are on, not a build-time constant — see requestOrigin().
-      emailRedirectTo: `${await requestOrigin()}/auth/confirm`,
-    },
-  })
-  if (error) return { error: `We could not send your confirmation email: ${error.message}` }
+  // Re-read: the branding write above is what put the address and name on the
+  // row the email quotes back.
+  const ready = await findSignupByToken(signup.token)
+  const sent = await sendConfirmationLink(ready ?? signup, await requestOrigin())
+  if (!sent.ok) return { error: sent.error }
 
   redirect('/get/check-email')
 }

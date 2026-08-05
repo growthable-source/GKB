@@ -33,12 +33,19 @@ export function SurveyForm({
 
       {step.kind === 'choice' && (
         <>
-          <input type="hidden" name="answer" value={choice} />
+          {/* The answer rides on the submit button's own name/value rather than
+              a hidden input fed by state. A hidden input is set by onClick and
+              read when the form serialises — the same click — so whether the
+              value has landed depends on React flushing first. It usually does,
+              and when it does not the answer posts empty. The submitter's value
+              is part of the form data by construction. */}
           <div className="flex flex-col gap-2.5">
             {step.options?.map((option, index) => (
               <button
                 key={option}
                 type="submit"
+                name="answer"
+                value={option}
                 disabled={pending}
                 onClick={() => setChoice(option)}
                 className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors disabled:opacity-60 ${

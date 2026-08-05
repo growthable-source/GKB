@@ -20,12 +20,13 @@ export type Signup = {
   help_center_id: string | null
   claimed_at: string | null
   delivered_at: string | null
+  link_sent_at: string | null
   created_at: string
   updated_at: string
 }
 
 const FIELDS =
-  'id, token, email, full_name, role, company_size, agency_name, subaccount_count, marketing_opt_in, consented_at, center_name, center_slug, branding, step, help_center_id, claimed_at, delivered_at, created_at, updated_at'
+  'id, token, email, full_name, role, company_size, agency_name, subaccount_count, marketing_opt_in, consented_at, center_name, center_slug, branding, step, help_center_id, claimed_at, delivered_at, link_sent_at, created_at, updated_at'
 
 /**
  * Starts a signup, or returns the one this email already has open.

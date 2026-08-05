@@ -685,6 +685,7 @@ export type Database = {
           full_name: string
           help_center_id: string | null
           id: string
+          link_sent_at: string | null
           marketing_opt_in: boolean
           role: string | null
           step: string
@@ -706,6 +707,7 @@ export type Database = {
           full_name: string
           help_center_id?: string | null
           id?: string
+          link_sent_at?: string | null
           marketing_opt_in?: boolean
           role?: string | null
           step?: string
@@ -727,6 +729,7 @@ export type Database = {
           full_name?: string
           help_center_id?: string | null
           id?: string
+          link_sent_at?: string | null
           marketing_opt_in?: boolean
           role?: string | null
           step?: string
