@@ -25,6 +25,38 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Marketing site and signup funnel (/get), scoped to .mk so none of it can
+   leak into a tenant page. Deliberately a different visual world from the help
+   centers: those are branded by the customer, this one is Growthable's own, so
+   it is the one part of the app with a fixed palette rather than a per-tenant
+   one. Light only, like every other page here. */
+.mk {
+  background: var(--mk-paper);
+  color: var(--mk-ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+}
+
+.mk h1,
+.mk h2,
+.mk h3,
+.mk .mk-display {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  font-weight: 400;
+  text-wrap: balance;
+}
+
+.mk .mk-mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* A table-of-contents leader: the dotted run between a category and its count.
+   Nudged up so it sits on the text baseline rather than under the descenders. */
+.mk .mk-leader {
+  flex: 1;
+  border-bottom: 1px dotted var(--mk-rule-strong);
+  transform: translateY(-0.28em);
+}
+
 /* Per-help-center accents, scoped to the public layout's .hc-theme wrapper.
    --hc-primary/--hc-secondary are set inline from the active help center;
    these rules only ever apply them as low-strength tints or borders, never

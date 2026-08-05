@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId, getBasePath } from '@/lib/tenancy/active'
 import { getCachedArticleCollectionIndex, getCachedCollections } from '@/lib/content/cached'
 import { countArticlesPerCollection } from '@/lib/content/queries'
 import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
@@ -7,7 +7,11 @@ import { tileGridClasses } from '@/lib/tenancy/theme'
 import { SearchBox } from '@/components/public/search-box'
 
 export default async function HomePage() {
-  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+  const [helpCenter, baseId, basePath] = await Promise.all([
+    getActiveHelpCenter(),
+    getBaseHelpCenterId(),
+    getBasePath(),
+  ])
   const [collections, index, excluded] = await Promise.all([
     getCachedCollections(baseId),
     getCachedArticleCollectionIndex(baseId),
@@ -26,7 +30,7 @@ export default async function HomePage() {
           {helpCenter.settings.subtitle && (
             <p className="opacity-80">{helpCenter.settings.subtitle}</p>
           )}
-          <SearchBox />
+          <SearchBox basePath={basePath} />
         </div>
       </section>
 
@@ -35,7 +39,7 @@ export default async function HomePage() {
           {collections.map((collection) => (
             <li key={collection.id}>
               <Link
-                href={`/${collection.slug}`}
+                href={`${basePath}/${collection.slug}`}
                 className="group block h-full rounded-xl border border-neutral-200 p-5 transition hover:border-[color:var(--hc-primary)] hover:shadow-sm"
               >
                 {collection.icon && (

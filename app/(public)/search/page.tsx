@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId, getBasePath } from '@/lib/tenancy/active'
 import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 import { searchHelpCenter } from '@/lib/search/search'
 import { SearchBox } from '@/components/public/search-box'
@@ -10,13 +10,17 @@ export default async function SearchPage({
   searchParams: Promise<{ q?: string }>
 }) {
   const { q = '' } = await searchParams
-  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+  const [helpCenter, baseId, basePath] = await Promise.all([
+    getActiveHelpCenter(),
+    getBaseHelpCenterId(),
+    getBasePath(),
+  ])
   const excluded = await getExcludedArticleIds(helpCenter.id)
   const hits = q.trim() ? await searchHelpCenter(baseId, q, 30, excluded) : []
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">
-      <SearchBox autoFocus />
+      <SearchBox autoFocus basePath={basePath} />
 
       {q.trim() && (
         <p className="mt-6 text-sm text-neutral-500">
@@ -27,7 +31,7 @@ export default async function SearchPage({
       <ul className="mt-4 divide-y divide-neutral-200 border-t border-neutral-200">
         {hits.map((hit) => (
           <li key={hit.articleId} className="py-4">
-            <Link href={`/a/${hit.slug}`} className="group block">
+            <Link href={`${basePath}/a/${hit.slug}`} className="group block">
               <h2 className="font-medium group-hover:text-[color:var(--hc-primary)] group-hover:underline">
                 {hit.title}
               </h2>

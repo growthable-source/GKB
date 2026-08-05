@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId, getBasePath } from '@/lib/tenancy/active'
 import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 import {
   getCachedArticle,
@@ -15,7 +15,11 @@ export default async function ArticlePage({
   params: Promise<{ collectionSlug: string; articleSlug: string }>
 }) {
   const { collectionSlug, articleSlug } = await params
-  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+  const [helpCenter, baseId, basePath] = await Promise.all([
+    getActiveHelpCenter(),
+    getBaseHelpCenterId(),
+    getBasePath(),
+  ])
 
   // The article and the collection list are independent; only the sibling list
   // depends on which collection the article resolves to.
@@ -43,11 +47,11 @@ export default async function ArticlePage({
     <div className="mx-auto flex max-w-5xl gap-12 px-5 py-12">
       <article className="min-w-0 flex-1">
         <nav className="mb-6 text-sm text-neutral-500">
-          <Link href="/" className="hover:text-[color:var(--hc-primary)] hover:underline">
+          <Link href={`${basePath}/`} className="hover:text-[color:var(--hc-primary)] hover:underline">
             All collections
           </Link>
           <span className="mx-2">/</span>
-          <Link href={`/${collection.slug}`} className="hover:text-[color:var(--hc-primary)] hover:underline">
+          <Link href={`${basePath}/${collection.slug}`} className="hover:text-[color:var(--hc-primary)] hover:underline">
             {collection.title}
           </Link>
         </nav>
@@ -63,7 +67,7 @@ export default async function ArticlePage({
         <div className="mt-16 flex justify-between gap-4 border-t border-neutral-200 pt-6 text-sm">
           {previous ? (
             <Link
-              href={`/${collection.slug}/${previous.slug}`}
+              href={`${basePath}/${collection.slug}/${previous.slug}`}
               className="hover:text-[color:var(--hc-primary)] hover:underline"
             >
               ← {previous.title}
@@ -73,7 +77,7 @@ export default async function ArticlePage({
           )}
           {next && (
             <Link
-              href={`/${collection.slug}/${next.slug}`}
+              href={`${basePath}/${collection.slug}/${next.slug}`}
               className="text-right hover:text-[color:var(--hc-primary)] hover:underline"
             >
               {next.title} →

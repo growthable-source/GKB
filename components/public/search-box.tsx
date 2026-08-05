@@ -5,7 +5,18 @@ import { useRouter } from 'next/navigation'
 
 type Hit = { articleId: string; slug: string; title: string; headline: string }
 
-export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
+/**
+ * `basePath` is passed in rather than read from headers: this is a client
+ * component, and a hardcoded "/" here would walk a visitor out of the
+ * path-addressed help center they are searching and into the base center.
+ */
+export function SearchBox({
+  autoFocus = false,
+  basePath = '',
+}: {
+  autoFocus?: boolean
+  basePath?: string
+}) {
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<Hit[]>([])
   const [open, setOpen] = useState(false)
@@ -69,7 +80,9 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
     } else if (event.key === 'Enter') {
       event.preventDefault()
       const hit = hits[active]
-      router.push(hit ? `/a/${hit.slug}` : `/search?q=${encodeURIComponent(query)}`)
+      router.push(
+        hit ? `${basePath}/a/${hit.slug}` : `${basePath}/search?q=${encodeURIComponent(query)}`,
+      )
     } else if (event.key === 'Escape') {
       setOpen(false)
     }
@@ -109,7 +122,7 @@ export function SearchBox({ autoFocus = false }: { autoFocus?: boolean }) {
           {hits.map((hit, index) => (
             <li key={hit.articleId} id={`search-box-option-${hit.articleId}`} role="option" aria-selected={index === active}>
               <a
-                href={`/a/${hit.slug}`}
+                href={`${basePath}/a/${hit.slug}`}
                 className={`block px-4 py-3 ${index === active ? 'hc-search-active' : ''}`}
               >
                 <span className="block text-sm font-medium">{hit.title}</span>

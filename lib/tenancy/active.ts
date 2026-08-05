@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { serviceClient } from '@/lib/db/client'
 import { BRAND_TAG, BRAND_TTL_SECONDS } from '@/lib/cache/tags'
 import { parseHeroStyle } from './theme'
+import { CENTER_SLUG_HEADER, CENTER_BASE_PATH_HEADER } from './path'
 
 export type ActiveHelpCenter = {
   id: string
@@ -172,6 +173,9 @@ export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => 
   const requestHeaders = await headers()
 
   const previewSlug = requestHeaders.get('x-preview-help-center-slug')
+  // Set by middleware from a /hc/{slug} URL. Already shape-checked there
+  // (lib/tenancy/path.ts), so it is safe to cache on, unlike ?preview=.
+  const pathSlug = requestHeaders.get(CENTER_SLUG_HEADER)
   const hostname = requestHeaders.get('host')?.split(':')[0].toLowerCase() ?? ''
   const label = hostname.split('.')[0]
   const wantsSlug = Boolean(label) && label !== 'www'
@@ -180,23 +184,37 @@ export const getActiveHelpCenter = cache(async (): Promise<ActiveHelpCenter> => 
   // them, so resolving them concurrently costs one round trip instead of up to
   // four. Precedence is decided below, by the order of these checks — never by
   // which query happens to resolve first.
-  const [preview, byDomain, bySlug, base] = await Promise.all([
+  const [preview, byPath, byDomain, bySlug, base] = await Promise.all([
     // Deliberately NOT cached. `?preview=` accepts any string from any visitor,
     // so caching it would let anyone flood the data cache with junk keys. The
     // host lookups below are safe to cache: Vercel only routes a request here
     // when its Host matches a domain assigned to this deployment.
     previewSlug ? findBySlug(serviceClient(), previewSlug) : null,
+    pathSlug ? cachedFindBySlug(pathSlug) : null,
     hostname ? cachedFindByHostname(hostname) : null,
     hostname && wantsSlug ? cachedFindBySlug(label) : null,
     cachedFindBase(),
   ])
 
   if (preview) return toActiveHelpCenter(preview)
+  if (byPath) return toActiveHelpCenter(byPath)
   if (byDomain) return toActiveHelpCenter(byDomain)
   if (bySlug) return toActiveHelpCenter(bySlug)
   if (!base) throw new Error('No base help center found: missing row')
 
   return toActiveHelpCenter(base)
+})
+
+/**
+ * What every link on a public page must be prefixed with.
+ *
+ * Empty for a host-addressed center, `/hc/{slug}` for a path-addressed one.
+ * Every href in the public routes goes through this: a link that skips it
+ * drops the visitor out of the tenant they were reading and into the base
+ * center, which is the single easiest way to break path addressing.
+ */
+export const getBasePath = cache(async (): Promise<string> => {
+  return (await headers()).get(CENTER_BASE_PATH_HEADER) ?? ''
 })
 
 /**

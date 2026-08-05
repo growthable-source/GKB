@@ -670,6 +670,80 @@ export type Database = {
         }
         Relationships: []
       }
+      signups: {
+        Row: {
+          agency_name: string | null
+          branding: Json
+          center_name: string | null
+          center_slug: string | null
+          claimed_at: string | null
+          company_size: string | null
+          consented_at: string | null
+          created_at: string
+          delivered_at: string | null
+          email: string
+          full_name: string
+          help_center_id: string | null
+          id: string
+          marketing_opt_in: boolean
+          role: string | null
+          step: string
+          subaccount_count: string | null
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          agency_name?: string | null
+          branding?: Json
+          center_name?: string | null
+          center_slug?: string | null
+          claimed_at?: string | null
+          company_size?: string | null
+          consented_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          email: string
+          full_name: string
+          help_center_id?: string | null
+          id?: string
+          marketing_opt_in?: boolean
+          role?: string | null
+          step?: string
+          subaccount_count?: string | null
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          agency_name?: string | null
+          branding?: Json
+          center_name?: string | null
+          center_slug?: string | null
+          claimed_at?: string | null
+          company_size?: string | null
+          consented_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          email?: string
+          full_name?: string
+          help_center_id?: string | null
+          id?: string
+          marketing_opt_in?: boolean
+          role?: string | null
+          step?: string
+          subaccount_count?: string | null
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signups_help_center_id_fkey"
+            columns: ["help_center_id"]
+            isOneToOne: false
+            referencedRelation: "help_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

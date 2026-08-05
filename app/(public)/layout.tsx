@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { getActiveHelpCenter } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBasePath } from '@/lib/tenancy/active'
 import { safeHex, DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 import { heroBackground, heroForeground, HERO_FOREGROUND_HEX } from '@/lib/tenancy/theme'
 import { fontStack } from '@/lib/fonts/options'
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
-  const helpCenter = await getActiveHelpCenter()
+  const [helpCenter, basePath] = await Promise.all([getActiveHelpCenter(), getBasePath()])
 
   return (
     <div
@@ -26,7 +26,7 @@ export default async function PublicLayout({ children }: { children: React.React
     >
       <header className="border-b border-neutral-200">
         <div className="mx-auto flex max-w-4xl items-center gap-4 px-5 py-4">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
+          <Link href={`${basePath}/`} className="flex items-center gap-2 font-semibold">
             {helpCenter.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={helpCenter.logoUrl} alt={helpCenter.name} className="h-7 w-auto" />

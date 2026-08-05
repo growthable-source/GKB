@@ -7,4 +7,7 @@
  */
 export const RESERVED_SLUGS = new Set([
   'www', 'api', 'admin', 'a', 'search', 'login', 'auth', 'assets', 'ops',
+  // Signup funnel, the customer dashboard, and the prefix every path-addressed
+  // help center sits under (lib/tenancy/path.ts).
+  'get', 'hc', 'dashboard',
 ])

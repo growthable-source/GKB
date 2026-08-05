@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId, getBasePath } from '@/lib/tenancy/active'
 import { getCachedArticlesInCollection, getCachedCollections } from '@/lib/content/cached'
 import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 
@@ -10,7 +10,11 @@ export default async function CollectionPage({
   params: Promise<{ collectionSlug: string }>
 }) {
   const { collectionSlug } = await params
-  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+  const [helpCenter, baseId, basePath] = await Promise.all([
+    getActiveHelpCenter(),
+    getBaseHelpCenterId(),
+    getBasePath(),
+  ])
 
   const collections = await getCachedCollections(baseId)
   const collection = collections.find((c) => c.slug === collectionSlug)
@@ -25,7 +29,7 @@ export default async function CollectionPage({
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">
       <nav className="mb-6 text-sm text-neutral-500">
-        <Link href="/" className="hover:text-[color:var(--hc-primary)] hover:underline">
+        <Link href={`${basePath}/`} className="hover:text-[color:var(--hc-primary)] hover:underline">
           All collections
         </Link>
         <span className="mx-2">/</span>
@@ -43,7 +47,7 @@ export default async function CollectionPage({
         )}
         {articles.map((article) => (
           <li key={article.id} className="py-4">
-            <Link href={`/${collection.slug}/${article.slug}`} className="group block">
+            <Link href={`${basePath}/${collection.slug}/${article.slug}`} className="group block">
               <h2 className="font-medium group-hover:underline">{article.title}</h2>
               {article.excerpt && (
                 <p className="mt-1 line-clamp-2 text-sm text-neutral-600">{article.excerpt}</p>

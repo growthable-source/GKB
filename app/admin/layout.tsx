@@ -12,7 +12,15 @@ const NAV = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const actor = await currentActor()
   if (!actor.userId) redirect('/login')
-  if (actor.memberships.length === 0) {
+
+  // A global membership, not merely any membership. Self-serve customers hold
+  // an `editor` membership scoped to the one center they own; admitting them
+  // here would seat them in the internal shell reading the shared article list,
+  // which no page-level check would catch — the mutations authorize, the reads
+  // do not.
+  const isStaff = actor.memberships.some((membership) => membership.helpCenterId === null)
+  if (!isStaff) {
+    if (actor.memberships.length > 0) redirect('/dashboard')
     return (
       <main className="mx-auto max-w-md px-6 py-24 text-center">
         <h1 className="text-xl font-semibold">No access</h1>

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getActiveHelpCenter, getBaseHelpCenterId } from '@/lib/tenancy/active'
+import { getActiveHelpCenter, getBaseHelpCenterId, getBasePath } from '@/lib/tenancy/active'
 import { getCachedArticle, getCachedCollections } from '@/lib/content/cached'
 import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 
@@ -8,16 +8,20 @@ export async function GET(
   { params }: { params: Promise<{ articleSlug: string }> },
 ) {
   const { articleSlug } = await params
-  const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+  const [helpCenter, baseId, basePath] = await Promise.all([
+    getActiveHelpCenter(),
+    getBaseHelpCenterId(),
+    getBasePath(),
+  ])
 
   const [article, collections, excluded] = await Promise.all([
     getCachedArticle(baseId, articleSlug),
     getCachedCollections(baseId),
     getExcludedArticleIds(helpCenter.id),
   ])
-  if (!article || excluded.has(article.id)) redirect('/')
+  if (!article || excluded.has(article.id)) redirect(`${basePath}/`)
 
   const collection = collections.find((c) => c.id === article.collectionId)
 
-  redirect(collection ? `/${collection.slug}/${article.slug}` : '/')
+  redirect(collection ? `${basePath}/${collection.slug}/${article.slug}` : `${basePath}/`)
 }
