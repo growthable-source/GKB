@@ -9,8 +9,9 @@ export async function GET(request: Request) {
 
   try {
     const [helpCenter, baseId] = await Promise.all([getActiveHelpCenter(), getBaseHelpCenterId()])
+    const ownerId = helpCenter.id === baseId ? null : helpCenter.id
     const excluded = await getExcludedArticleIds(helpCenter.id)
-    const hits = await searchHelpCenter(baseId, query, 8, excluded)
+    const hits = await searchHelpCenter(baseId, query, 8, excluded, ownerId)
     return NextResponse.json({ hits })
   } catch (error) {
     // Log the real error server-side; the response must not leak internals.

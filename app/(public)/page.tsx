@@ -1,6 +1,11 @@
 import Link from 'next/link'
 import { getActiveHelpCenter, getBaseHelpCenterId, getBasePath } from '@/lib/tenancy/active'
-import { getCachedArticleCollectionIndex, getCachedCollections } from '@/lib/content/cached'
+import {
+  getCachedArticleCollectionIndex,
+  getCachedCollections,
+  getCachedOwnedArticleCollectionIndex,
+  getCachedOwnedCollections,
+} from '@/lib/content/cached'
 import { countArticlesPerCollection } from '@/lib/content/queries'
 import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 import { tileGridClasses } from '@/lib/tenancy/theme'
@@ -12,13 +17,24 @@ export default async function HomePage() {
     getBaseHelpCenterId(),
     getBasePath(),
   ])
-  const [collections, index, excluded] = await Promise.all([
+  // A tenant reads the shared library plus whatever it owns; the base center
+  // owns the shared library itself and has no second half.
+  const ownerId = helpCenter.id === baseId ? null : helpCenter.id
+
+  const [shared, owned, index, ownedIndex, excluded] = await Promise.all([
     getCachedCollections(baseId),
+    ownerId ? getCachedOwnedCollections(ownerId) : [],
     getCachedArticleCollectionIndex(baseId),
+    ownerId ? getCachedOwnedArticleCollectionIndex(ownerId) : [],
     // This center's hidden articles, so its tile counts match what it shows.
     getExcludedArticleIds(helpCenter.id),
   ])
-  const counts = countArticlesPerCollection(index, excluded)
+
+  // Shared collections keep their curated order; the centre's own follow.
+  const collections = [...shared, ...owned]
+  // Exclusions apply to the shared half only — a centre cannot hide its own
+  // article, it unpublishes or deletes it.
+  const counts = countArticlesPerCollection([...index, ...ownedIndex], excluded)
 
   return (
     <>

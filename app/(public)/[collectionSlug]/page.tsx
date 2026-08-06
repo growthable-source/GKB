@@ -1,7 +1,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getActiveHelpCenter, getBaseHelpCenterId, getBasePath } from '@/lib/tenancy/active'
-import { getCachedArticlesInCollection, getCachedCollections } from '@/lib/content/cached'
+import {
+  getCachedArticlesInCollection,
+  getCachedCollections,
+  getCachedOwnedArticles,
+  getCachedOwnedCollections,
+} from '@/lib/content/cached'
 import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 
 export default async function CollectionPage({
@@ -16,15 +21,26 @@ export default async function CollectionPage({
     getBasePath(),
   ])
 
-  const collections = await getCachedCollections(baseId)
-  const collection = collections.find((c) => c.slug === collectionSlug)
+  const ownerId = helpCenter.id === baseId ? null : helpCenter.id
+
+  const [shared, owned] = await Promise.all([
+    getCachedCollections(baseId),
+    ownerId ? getCachedOwnedCollections(ownerId) : [],
+  ])
+  // Their own collections are searched too, so a centre can reach a category it
+  // created rather than only the shared ones.
+  const collection = [...shared, ...owned].find((c) => c.slug === collectionSlug)
   if (!collection) notFound()
 
-  const [allArticles, excluded] = await Promise.all([
+  const [allArticles, ownedArticles, excluded] = await Promise.all([
     getCachedArticlesInCollection(baseId, collection.id),
+    ownerId ? getCachedOwnedArticles(ownerId, collection.id) : [],
     getExcludedArticleIds(helpCenter.id),
   ])
-  const articles = allArticles.filter((article) => !excluded.has(article.id))
+  const articles = [
+    ...allArticles.filter((article) => !excluded.has(article.id)),
+    ...ownedArticles,
+  ]
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">

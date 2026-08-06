@@ -36,7 +36,11 @@ export function SearchBox({
       }
 
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+        // Prefixed like every other link. The API route resolves its help
+        // center from the request, and an unprefixed /api/search resolves to
+        // the base centre — so on a path-addressed tenant the dropdown would
+        // silently miss every article that tenant wrote.
+        const response = await fetch(`${basePath}/api/search?q=${encodeURIComponent(query)}`, {
           signal: controller.signal,
         })
         if (!response.ok) throw new Error(`Search request failed: ${response.status}`)
@@ -60,7 +64,7 @@ export function SearchBox({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [query])
+  }, [query, basePath])
 
   useEffect(() => {
     function onClick(event: MouseEvent) {

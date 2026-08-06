@@ -6,6 +6,9 @@ import {
   getCachedArticle,
   getCachedArticlesInCollection,
   getCachedCollections,
+  getCachedOwnedArticle,
+  getCachedOwnedArticles,
+  getCachedOwnedCollections,
 } from '@/lib/content/cached'
 import { addHeadingIds, extractHeadings } from '@/lib/content/toc'
 
@@ -23,19 +26,35 @@ export default async function ArticlePage({
 
   // The article and the collection list are independent; only the sibling list
   // depends on which collection the article resolves to.
-  const [article, collections, excluded] = await Promise.all([
+  const ownerId = helpCenter.id === baseId ? null : helpCenter.id
+
+  const [sharedArticle, ownedArticle, shared, owned, excluded] = await Promise.all([
     getCachedArticle(baseId, articleSlug),
+    ownerId ? getCachedOwnedArticle(ownerId, articleSlug) : null,
     getCachedCollections(baseId),
+    ownerId ? getCachedOwnedCollections(ownerId) : [],
     getExcludedArticleIds(helpCenter.id),
   ])
+
+  // The centre's own article wins. Slugs are unique per owner, so a tenant may
+  // hold one the shared library also uses — and on their help centre, theirs is
+  // the one they published and expect to see.
+  const article = ownedArticle ?? sharedArticle
   // Excluded means excluded however you arrive, not just from the listings.
   if (!article || excluded.has(article.id)) notFound()
 
+  const collections = [...shared, ...owned]
   const collection = collections.find((c) => c.id === article.collectionId)
   if (!collection || collection.slug !== collectionSlug) notFound()
 
-  const allSiblings = await getCachedArticlesInCollection(baseId, collection.id)
-  const siblings = allSiblings.filter((sibling) => !excluded.has(sibling.id))
+  const [allSiblings, ownedSiblings] = await Promise.all([
+    getCachedArticlesInCollection(baseId, collection.id),
+    ownerId ? getCachedOwnedArticles(ownerId, collection.id) : [],
+  ])
+  const siblings = [
+    ...allSiblings.filter((sibling) => !excluded.has(sibling.id)),
+    ...ownedSiblings,
+  ]
   const index = siblings.findIndex((s) => s.id === article.id)
   const previous = index > 0 ? siblings[index - 1] : null
   const next = index >= 0 && index < siblings.length - 1 ? siblings[index + 1] : null

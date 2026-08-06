@@ -15,8 +15,9 @@ export default async function SearchPage({
     getBaseHelpCenterId(),
     getBasePath(),
   ])
+  const ownerId = helpCenter.id === baseId ? null : helpCenter.id
   const excluded = await getExcludedArticleIds(helpCenter.id)
-  const hits = q.trim() ? await searchHelpCenter(baseId, q, 30, excluded) : []
+  const hits = q.trim() ? await searchHelpCenter(baseId, q, 30, excluded, ownerId) : []
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">

@@ -1,6 +1,11 @@
 import { redirect } from 'next/navigation'
 import { getActiveHelpCenter, getBaseHelpCenterId, getBasePath } from '@/lib/tenancy/active'
-import { getCachedArticle, getCachedCollections } from '@/lib/content/cached'
+import {
+  getCachedArticle,
+  getCachedCollections,
+  getCachedOwnedArticle,
+  getCachedOwnedCollections,
+} from '@/lib/content/cached'
 import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
 
 export async function GET(
@@ -14,14 +19,21 @@ export async function GET(
     getBasePath(),
   ])
 
-  const [article, collections, excluded] = await Promise.all([
+  const ownerId = helpCenter.id === baseId ? null : helpCenter.id
+
+  const [sharedArticle, ownedArticle, shared, owned, excluded] = await Promise.all([
     getCachedArticle(baseId, articleSlug),
+    ownerId ? getCachedOwnedArticle(ownerId, articleSlug) : null,
     getCachedCollections(baseId),
+    ownerId ? getCachedOwnedCollections(ownerId) : [],
     getExcludedArticleIds(helpCenter.id),
   ])
+
+  // Their own wins, same precedence as the article page.
+  const article = ownedArticle ?? sharedArticle
   if (!article || excluded.has(article.id)) redirect(`${basePath}/`)
 
-  const collection = collections.find((c) => c.id === article.collectionId)
+  const collection = [...shared, ...owned].find((c) => c.id === article.collectionId)
 
   redirect(collection ? `${basePath}/${collection.slug}/${article.slug}` : `${basePath}/`)
 }

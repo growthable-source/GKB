@@ -30,6 +30,13 @@ export async function searchHelpCenter(
   query: string,
   limit = 20,
   excludedArticleIds: Set<string> = new Set(),
+  /**
+   * A center's own id, when it is a tenant with articles of its own. Its index
+   * rows live under this id, so they are invisible to a search of the base
+   * index — which reads as the search box being broken rather than the feature
+   * being absent.
+   */
+  ownedHelpCenterId?: string | null,
 ): Promise<SearchHit[]> {
   const trimmed = query.trim()
   if (!trimmed) return []
@@ -39,15 +46,27 @@ export async function searchHelpCenter(
       ? limit
       : Math.min(limit + excludedArticleIds.size, limit + MAX_OVERFETCH)
 
-  const { data, error } = await serviceClient().rpc('search_help_center', {
-    p_help_center_id: baseHelpCenterId,
-    p_query: trimmed,
-    p_limit: fetchLimit,
-  })
+  const search = (helpCenterId: string) =>
+    serviceClient().rpc('search_help_center', {
+      p_help_center_id: helpCenterId,
+      p_query: trimmed,
+      p_limit: fetchLimit,
+    })
 
-  if (error) throw new Error(`searchHelpCenter failed: ${error.message}`)
+  // Two indexes, one ranking. The RPC returns ts_rank, so the halves can be
+  // merged on the same scale rather than one being arbitrarily stapled after
+  // the other — a tenant's own article should outrank a weak shared match, and
+  // vice versa.
+  const [shared, owned] = await Promise.all([
+    search(baseHelpCenterId),
+    ownedHelpCenterId ? search(ownedHelpCenterId) : Promise.resolve({ data: [], error: null }),
+  ])
 
-  return (data ?? [])
+  if (shared.error) throw new Error(`searchHelpCenter failed: ${shared.error.message}`)
+  if (owned.error) throw new Error(`searchHelpCenter (owned) failed: ${owned.error.message}`)
+
+  return [...(shared.data ?? []), ...(owned.data ?? [])]
+    .sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0))
     .filter((row) => !excludedArticleIds.has(row.article_id))
     .slice(0, limit)
     .map((row) => ({
