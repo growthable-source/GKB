@@ -183,6 +183,7 @@ export type Database = {
           description: string | null
           icon: string | null
           id: string
+          origin_help_center_id: string | null
           slug: string
           title: string
           updated_at: string
@@ -192,6 +193,7 @@ export type Database = {
           description?: string | null
           icon?: string | null
           id?: string
+          origin_help_center_id?: string | null
           slug: string
           title: string
           updated_at?: string
@@ -201,11 +203,20 @@ export type Database = {
           description?: string | null
           icon?: string | null
           id?: string
+          origin_help_center_id?: string | null
           slug?: string
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "collections_origin_help_center_id_fkey"
+            columns: ["origin_help_center_id"]
+            isOneToOne: false
+            referencedRelation: "help_centers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       custom_domains: {
         Row: {
@@ -426,6 +437,7 @@ export type Database = {
           is_base: boolean
           logo_url: string | null
           name: string
+          plan: string
           primary_hex: string
           secondary_hex: string
           settings: Json
@@ -449,6 +461,7 @@ export type Database = {
           is_base?: boolean
           logo_url?: string | null
           name: string
+          plan?: string
           primary_hex?: string
           secondary_hex?: string
           settings?: Json
@@ -472,6 +485,7 @@ export type Database = {
           is_base?: boolean
           logo_url?: string | null
           name?: string
+          plan?: string
           primary_hex?: string
           secondary_hex?: string
           settings?: Json

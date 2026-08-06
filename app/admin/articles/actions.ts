@@ -152,7 +152,7 @@ export async function publishArticle(articleId: string): Promise<void> {
   // Replace the placeholder slug with one derived from the final title.
   let slug = article.slug
   if (slug.startsWith('untitled')) {
-    slug = await nextAvailableSlug('articles', slugify(article.title), articleId)
+    slug = await nextAvailableSlug('articles', slugify(article.title), { excludeId: articleId })
   }
 
   const { error } = await db
