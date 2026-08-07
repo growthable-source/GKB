@@ -80,8 +80,8 @@ export default async function AiAgentPage() {
             ))}
           </ul>
           <p className="mt-4 text-sm text-neutral-600">
-            It goes live on your help centre the moment you add it — there&rsquo;s no code to
-            copy and nothing to paste.
+            It goes live on your help centre the moment you add it — nothing to paste there. You
+            get the embed code as well, for adding it to your HighLevel agency.
           </p>
           <div className="mt-5">
             <AddWidgetButton
