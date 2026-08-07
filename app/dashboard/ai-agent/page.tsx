@@ -4,6 +4,7 @@ import { getInstallForCenter } from '@/lib/ai-widget/repository'
 import { getInstall, isXoveraConfigured, type InstallResponse } from '@/lib/ai-widget/client'
 import { AiWidgetBuilder } from '@/components/dashboard/ai-widget-builder'
 import { AddWidgetButton, RemoveWidgetButton } from '@/components/dashboard/ai-widget-buttons'
+import { AiWidgetSnippet } from '@/components/dashboard/ai-widget-snippet'
 import { addAiWidget, removeAiWidget } from './actions'
 
 export const metadata = { title: 'AI chat widget — Growthable' }
@@ -28,6 +29,7 @@ const PITCH = [
   'Answers your clients’ GoHighLevel questions instantly, day or night.',
   'Reads the full public GoHighLevel help centre — around 24,000 passages.',
   'Says so and offers a human when it does not know, rather than inventing an answer.',
+  'Goes on your help centre automatically, and you can paste it into your HighLevel agency too.',
 ]
 
 /** Live status from Xovera, or null when they cannot be reached. */
@@ -60,6 +62,11 @@ export default async function AiAgentPage() {
   const install = await getInstallForCenter(center.id)
   const isLive = install?.status === 'ready'
   const live = isLive ? await liveStatus(install.externalId) : null
+
+  // Xovera's live copy wins over ours: the customer may have changed the widget
+  // in the builder since we stored it. Falls back to the stored one so the
+  // section still appears when Xovera cannot be reached.
+  const snippet = live?.widget?.embedSnippet ?? install?.embedSnippet ?? null
 
   if (!install || install.status === 'disabled') {
     return (
@@ -167,6 +174,25 @@ export default async function AiAgentPage() {
         <AiWidgetBuilder />
       </section>
 
+      {snippet && (
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Put it somewhere else too</h2>
+            <p className="mt-1 text-sm text-neutral-600">
+              Your help centre already has it — there&rsquo;s nothing to do there. Use this code to
+              add the same widget to your HighLevel agency, or anywhere else you can paste a
+              script. It&rsquo;s the same assistant and the same settings, so anything you change
+              above applies everywhere.
+            </p>
+          </div>
+          <AiWidgetSnippet snippet={snippet} />
+          <p className="text-xs text-neutral-500">
+            Paste it just before the closing <code>&lt;/body&gt;</code> tag, or into a custom-code
+            or tracking-code box if the site you&rsquo;re adding it to has one.
+          </p>
+        </section>
+      )}
+
       <section className="border-t border-neutral-200 pt-6">
         <RemoveWidgetButton action={removeAiWidget} />
       </section>
@@ -220,7 +246,8 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div>
         <h1 className="text-lg font-semibold">AI chat widget</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          A chat bubble on your help centre that answers GoHighLevel questions for your clients.
+          A chat bubble that answers GoHighLevel questions for your clients — on your help centre,
+          and anywhere else you want to put it.
         </p>
       </div>
       {children}

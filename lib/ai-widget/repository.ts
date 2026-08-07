@@ -19,13 +19,22 @@ export type WidgetInstall = {
   widgetId: string | null
   widgetPublicKey: string | null
   scriptSrc: string | null
+  /**
+   * Xovera's paste-ready snippet, verbatim.
+   *
+   * The help centre does NOT use this — it renders a script element from
+   * scriptSrc instead (see components/public/ai-widget.tsx). This is here so the
+   * dashboard can offer it for copying into places we do not render, chiefly the
+   * customer's own HighLevel agency.
+   */
+  embedSnippet: string | null
   status: InstallStatus
   failureReason: string | null
   trialEndsAt: string | null
 }
 
 const FIELDS =
-  'help_center_id, external_id, install_id, workspace_id, widget_id, widget_public_key, script_src, status, failure_reason, trial_ends_at'
+  'help_center_id, external_id, install_id, workspace_id, widget_id, widget_public_key, script_src, embed_snippet, status, failure_reason, trial_ends_at'
 
 type Row = {
   help_center_id: string
@@ -35,6 +44,7 @@ type Row = {
   widget_id: string | null
   widget_public_key: string | null
   script_src: string | null
+  embed_snippet: string | null
   status: string
   failure_reason: string | null
   trial_ends_at: string | null
@@ -60,6 +70,7 @@ function toInstall(row: Row): WidgetInstall {
     widgetId: row.widget_id,
     widgetPublicKey: row.widget_public_key,
     scriptSrc: row.script_src,
+    embedSnippet: row.embed_snippet,
     status: parseStatus(row.status),
     failureReason: row.failure_reason,
     trialEndsAt: row.trial_ends_at,

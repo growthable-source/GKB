@@ -59,6 +59,15 @@ is not theirs.
 `getBaseHelpCenterId()`. The latter owns the shared content and would put one
 agency's widget on every help centre we serve.
 
+**The snippet is shown, but only for placements we do not own.** The brief says
+not to show the snippet and ask the customer to paste it — that is right for the
+help centre, which we render and inject ourselves. It does not cover the second
+placement customers want: their own HighLevel agency, where we have no pages to
+inject into. So the dashboard renders the embed code under a heading that says
+plainly that the help centre is already handled. The live snippet from
+`GET /installs` wins over the stored one, falling back when Xovera is
+unreachable. **This placement depends on open item 3 below.**
+
 **The paused toggle is not mirrored.** Xovera's builder has a live/paused
 switch. Mirroring it would mean polling their API on public page renders;
 their own script decides whether to draw anything, so we let it.
@@ -83,13 +92,27 @@ the one place to change.
 2. **`PARTNER_FRAME_ANCESTORS`** — Xovera must list our admin origins or the
    browser refuses to render the builder iframe. Send them the production
    dashboard origin plus any preview origins that need it.
-3. **Origin allowlist is coarse for path-addressed centres.** `helpCenterUrl`
-   seeds it, and a path-addressed centre's URL is
-   `https://app.growthable.io/hc/{slug}` — an origin shared with every other
-   centre on the deployment. Isolation between those tenants rests on the
-   widget's public key, not the origin. Custom-domain centres get real
-   per-tenant isolation. Worth confirming Xovera is comfortable with that.
-4. **Write budget is 60 per 10 minutes for the whole integration**, not per
+3. **The origin allowlist blocks the HighLevel placement, and the API has no
+   field to fix it.** `helpCenterUrl` is the only origin input the provisioning
+   payload accepts, and per the brief it exists precisely so "the embed can't be
+   lifted onto an unrelated site". A customer's HighLevel agency IS an unrelated
+   site by that rule, so the pasted snippet will be refused unless one of these
+   happens on Xovera's side:
+   - the allowlist gains the HighLevel domains (including white-labelled ones,
+     which vary per agency, so this may need to be per-install); or
+   - provisioning accepts an `origins` array, and we send it; or
+   - the widget authenticates on its public key alone and the origin check is
+     advisory.
+
+   The dashboard UI for this placement is built and ready. Until one of the
+   above lands it will hand customers a snippet that does not run.
+
+4. **Origin allowlist is also coarse for path-addressed centres.** A
+   path-addressed centre's URL is `https://app.growthable.io/hc/{slug}` — an
+   origin shared with every other centre on the deployment. Isolation between
+   those tenants rests on the widget's public key, not the origin.
+   Custom-domain centres get real per-tenant isolation.
+5. **Write budget is 60 per 10 minutes for the whole integration**, not per
    customer. Fine for click-driven provisioning; it would not survive a
    backfill. If we ever bulk-provision existing centres, it needs throttling.
 
