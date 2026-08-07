@@ -49,11 +49,24 @@ leaves a row that knows its own key, so the retry resumes rather than starting
 over. The provisioning screen carries a retry button for exactly this reason —
 without it, a crash between the two writes strands that screen forever.
 
-**The builder URL is minted per mount, never stored.** The token is single-use
+**The builder opens in a new tab, not an iframe.** The brief suggests an iframe
+and that is what shipped first. It did not survive contact with a browser: the
+builder's session cookie is `SameSite=None`, so Safari (which blocks
+third-party cookies by default) and any Chrome profile with them disabled got
+Xovera's "session has expired" padlock instead of the builder. The frame is
+cross-origin, so we cannot detect that state and fall back automatically — the
+customer just sees something broken. Top-level makes Xovera first-party and
+works everywhere. One extra click beats a coin flip on whether the panel loads.
+
+**The builder URL is minted on click, never stored.** The token is single-use
 and lives 10 minutes, so caching it breaks the second open *and* a plain page
-refresh. `POST /api/dashboard/ai-widget/builder-link` takes no parameters — the
-centre comes from the session, so nobody can mint a link into a workspace that
-is not theirs.
+refresh. Minting on click rather than on mount also stops the page spending one
+of Xovera's 60-writes-per-10-minutes every time anyone merely *looks* at it.
+`POST /api/dashboard/ai-widget/builder-link` takes no parameters — the centre
+comes from the session, so nobody can mint a link into a workspace that is not
+theirs. The new tab is opened synchronously inside the click and navigated when
+the link lands, because a popup blocker rejects a `window.open` that happens
+after an await.
 
 **Injection is keyed on the brand centre**, `getActiveHelpCenter().id`, not
 `getBaseHelpCenterId()`. The latter owns the shared content and would put one
@@ -86,12 +99,12 @@ the one place to change.
 
 ## Open items for Ryan
 
-1. **`XOVERA_API_KEY`** — org-scope (`vox_live_…`), needs setting in Vercel.
-   Unset is a supported state: the dashboard shows the feature as unavailable
-   rather than failing on click.
-2. **`PARTNER_FRAME_ANCESTORS`** — Xovera must list our admin origins or the
-   browser refuses to render the builder iframe. Send them the production
-   dashboard origin plus any preview origins that need it.
+~~1. `XOVERA_API_KEY`~~ — done, set in Vercel. Unset remains a supported state:
+the dashboard shows the feature as unavailable rather than failing on click.
+
+~~2. `PARTNER_FRAME_ANCESTORS`~~ — moot. It was set correctly and the frame did
+render; the builder is no longer iframed, for the cookie reason above.
+
 3. **The origin allowlist blocks the HighLevel placement, and the API has no
    field to fix it.** `helpCenterUrl` is the only origin input the provisioning
    payload accepts, and per the brief it exists precisely so "the embed can't be
@@ -118,7 +131,11 @@ the one place to change.
 
 ## Verification
 
-`pnpm test`, `pnpm tsc --noEmit`, `pnpm lint`, and `pnpm build` all pass. The
-brief's end-to-end checklist (widget appears, answers, no duplicate on second
-click, colour change propagates, refresh re-mints, blocked-cookie fallback,
-DELETE stops the script) needs a real `XOVERA_API_KEY` and has not been run.
+`pnpm test`, `pnpm tsc --noEmit`, `pnpm lint`, and `pnpm build` all pass.
+
+Confirmed live: migration applied, provisioning succeeds from the dashboard
+button, and minting a builder link returns a valid URL.
+
+Still to confirm live: the widget answering on the help centre, the
+unanswerable-question behaviour, no duplicate workspace on a second click, a
+colour change reaching the live widget, and `DELETE` stopping the script.

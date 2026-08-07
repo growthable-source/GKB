@@ -168,7 +168,8 @@ export default async function AiAgentPage() {
         <div>
           <h2 className="text-lg font-semibold">Customise it</h2>
           <p className="mt-1 text-sm text-neutral-600">
-            Colours, logo, greeting, and where it sits on the page. Changes go live straight away.
+            Colours, logo, greeting, and where it sits on the page. Opens in a new tab, and
+            changes go live straight away.
           </p>
         </div>
         <AiWidgetBuilder />

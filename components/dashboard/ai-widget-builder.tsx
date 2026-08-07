@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 type Minted = { builderUrl?: string; error?: string }
 
@@ -14,84 +14,87 @@ async function mint(): Promise<Minted> {
 }
 
 /**
- * Xovera's appearance builder, embedded.
+ * Opens Xovera's appearance builder in a new tab.
  *
- * Two things this has to get right, both of which look like bugs if it doesn't:
+ * It used to be an iframe, which is what their brief suggests. In practice the
+ * builder's session cookie is SameSite=None, so any browser blocking
+ * third-party cookies — Safari by default, Chrome increasingly — showed their
+ * "session has expired" padlock instead of the builder. The frame is
+ * cross-origin, so we could not detect that and react to it; the customer just
+ * saw a broken panel. Top-level makes Xovera first-party, so it works
+ * everywhere, and one extra click beats a coin flip on whether the panel loads.
  *
- *  1. The token is single-use and expires in 10 minutes, so the URL is minted on
- *     mount and never stored. A refresh remounts and mints again — caching it
- *     would show "this link is no longer valid" on the second open.
- *  2. The builder's session cookie is SameSite=None, so a browser blocking
- *     third-party cookies renders a "session has expired" panel inside the
- *     frame that we cannot detect from out here. The new-tab escape hatch is
- *     therefore always offered, not held back for an error state — top-level is
- *     first-party, so it works where the frame does not.
+ * The link is minted on click rather than on mount. That is also why this is
+ * cheaper than the iframe was: minting is a write against Xovera's 60-per-10-
+ * minutes budget shared across all customers, and the old version spent one
+ * every time anyone loaded this page.
  */
 export function AiWidgetBuilder() {
-  const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
+  /** Set only when the popup blocker beat us, so the customer can click through manually. */
+  const [manualUrl, setManualUrl] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
+  const open = useCallback(() => {
+    setError(null)
+    setManualUrl(null)
+    setOpening(true)
+
+    // Opened synchronously, inside the click, because a popup blocker rejects a
+    // window.open that happens after an await. It is navigated once the link
+    // arrives. Not passing 'noopener' here on purpose: that makes window.open
+    // return null, leaving nothing to navigate — so the opener link is severed
+    // on the handle instead.
+    const tab = window.open('', '_blank')
+    if (tab) tab.opener = null
 
     void mint().then((result) => {
-      if (cancelled) return
-      if (result.builderUrl) setUrl(result.builderUrl)
-      else setError(result.error ?? null)
+      setOpening(false)
+
+      if (!result.builderUrl) {
+        tab?.close()
+        setError(result.error ?? 'We could not open the customiser right now.')
+        return
+      }
+
+      if (tab) tab.location.href = result.builderUrl
+      // The tab never opened, so hand the link over rather than silently
+      // spending a single-use token on nothing.
+      else setManualUrl(result.builderUrl)
     })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // A second mint, because the one in the iframe has already been spent.
-  const openInTab = useCallback(async () => {
-    setOpening(true)
-    const result = await mint()
-    setOpening(false)
-
-    if (result.builderUrl) window.open(result.builderUrl, '_blank', 'noopener,noreferrer')
-    else setError(result.error ?? null)
   }, [])
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Above the panel, not under it. Safari blocks third-party cookies by
-          default and Chrome is going the same way, so landing on Xovera's
-          "session has expired" screen is a normal outcome rather than a rare
-          one — and from out here we cannot detect it to react, because the
-          frame is cross-origin. The way out has to be visible before the
-          customer needs it. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
-        <p className="text-sm text-neutral-600">
-          Seeing a padlock or “session has expired” below? That&rsquo;s your browser blocking
-          cookies in the panel, not a problem with your widget.
-        </p>
-        <button
-          type="button"
-          onClick={() => void openInTab()}
-          disabled={opening}
-          className="w-fit shrink-0 cursor-pointer rounded-md border border-neutral-400 bg-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
-        >
-          {opening ? 'Opening…' : 'Open in a new tab'}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={open}
+        disabled={opening}
+        className="w-fit cursor-pointer rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-default disabled:opacity-60"
+      >
+        {opening ? 'Opening…' : 'Open the customiser'}
+      </button>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-        {error ? (
-          <p className="px-4 py-6 text-sm text-neutral-600">{error}</p>
-        ) : url ? (
-          <iframe
-            src={url}
-            title="Customise your AI chat widget"
-            className="h-[820px] w-full border-0"
-          />
-        ) : (
-          <p className="px-4 py-6 text-sm text-neutral-500">Opening the customiser…</p>
-        )}
-      </div>
+      <p className="text-xs text-neutral-500">
+        Opens in a new tab. Come back to this one when you&rsquo;re done — your changes go live
+        straight away.
+      </p>
+
+      {error && (
+        <p className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+          {error}
+        </p>
+      )}
+
+      {manualUrl && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Your browser blocked the new tab.{' '}
+          <a href={manualUrl} target="_blank" rel="noreferrer" className="font-medium underline">
+            Open the customiser
+          </a>
+          . This link works once, so use it now rather than saving it.
+        </p>
+      )}
     </div>
   )
 }
