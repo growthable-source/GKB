@@ -34,6 +34,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_widget_installs: {
+        Row: {
+          created_at: string
+          embed_snippet: string | null
+          external_id: string
+          failure_reason: string | null
+          help_center_id: string
+          install_id: string | null
+          script_src: string | null
+          status: string
+          trial_ends_at: string | null
+          updated_at: string
+          widget_id: string | null
+          widget_public_key: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          embed_snippet?: string | null
+          external_id: string
+          failure_reason?: string | null
+          help_center_id: string
+          install_id?: string | null
+          script_src?: string | null
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          widget_id?: string | null
+          widget_public_key?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          embed_snippet?: string | null
+          external_id?: string
+          failure_reason?: string | null
+          help_center_id?: string
+          install_id?: string | null
+          script_src?: string | null
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          widget_id?: string | null
+          widget_public_key?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_widget_installs_help_center_id_fkey"
+            columns: ["help_center_id"]
+            isOneToOne: true
+            referencedRelation: "help_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       article_revisions: {
         Row: {
           article_id: string

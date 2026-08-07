@@ -7,6 +7,7 @@ const NAV = [
   { href: '/dashboard/articles', label: 'Articles' },
   { href: '/dashboard/collections', label: 'Sections' },
   { href: '/dashboard/appearance', label: 'Appearance' },
+  { href: '/dashboard/ai-agent', label: 'AI chat widget' },
 ]
 
 // Rendered as plain text, not links: nothing behind them exists yet, and a nav

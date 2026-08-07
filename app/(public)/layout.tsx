@@ -3,6 +3,7 @@ import { getActiveHelpCenter, getBasePath } from '@/lib/tenancy/active'
 import { safeHex, DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 import { heroBackground, heroForeground, HERO_FOREGROUND_HEX } from '@/lib/tenancy/theme'
 import { fontStack } from '@/lib/fonts/options'
+import { AiWidget } from '@/components/public/ai-widget'
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const [helpCenter, basePath] = await Promise.all([getActiveHelpCenter(), getBasePath()])
@@ -42,6 +43,11 @@ export default async function PublicLayout({ children }: { children: React.React
       <footer className="mt-16 border-t border-neutral-200 py-8">
         <p className="hc-secondary-muted mx-auto max-w-4xl px-5 text-sm">{helpCenter.name}</p>
       </footer>
+
+      {/* Keyed on the BRAND centre, which is the tenant the visitor is reading —
+          not getBaseHelpCenterId(), which owns the content and would put one
+          agency's widget on every centre. */}
+      <AiWidget helpCenterId={helpCenter.id} />
     </div>
   )
 }

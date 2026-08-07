@@ -1,0 +1,229 @@
+import { redirect } from 'next/navigation'
+import { getOwnedCenter } from '@/lib/dashboard/owned-center'
+import { getInstallForCenter } from '@/lib/ai-widget/repository'
+import { getInstall, isXoveraConfigured, type InstallResponse } from '@/lib/ai-widget/client'
+import { AiWidgetBuilder } from '@/components/dashboard/ai-widget-builder'
+import { AddWidgetButton, RemoveWidgetButton } from '@/components/dashboard/ai-widget-buttons'
+import { addAiWidget, removeAiWidget } from './actions'
+
+export const metadata = { title: 'AI chat widget — Growthable' }
+
+// The install's live state changes on Xovera's side (trial countdown, usage,
+// the customer upgrading in the builder), so this page must not be
+// prerendered against a build-time snapshot.
+export const dynamic = 'force-dynamic'
+
+const CARD = 'rounded-lg border border-neutral-200 bg-white p-5'
+
+/**
+ * What the widget can actually do, said accurately.
+ *
+ * The corpus every provisioned agent reads is the public GoHighLevel help
+ * centre — not the customer's own articles. Per-customer content is a planned
+ * follow-up. Until it lands, copy on this page promises GoHighLevel answers and
+ * nothing about "trained on your business", because the second one is not true
+ * and the customer will find that out in their first conversation.
+ */
+const PITCH = [
+  'Answers your clients’ GoHighLevel questions instantly, day or night.',
+  'Reads the full public GoHighLevel help centre — around 24,000 passages.',
+  'Says so and offers a human when it does not know, rather than inventing an answer.',
+]
+
+/** Live status from Xovera, or null when they cannot be reached. */
+async function liveStatus(externalId: string): Promise<InstallResponse | null> {
+  try {
+    return await getInstall(externalId)
+  } catch (error) {
+    // Degrades to the stored state rather than erroring the page: the widget is
+    // on the customer's help centre either way, and a Xovera blip should not
+    // make their dashboard look broken.
+    console.error(`Could not read AI widget status for ${externalId}:`, error)
+    return null
+  }
+}
+
+export default async function AiAgentPage() {
+  const center = await getOwnedCenter()
+  if (!center) redirect('/get/details')
+
+  if (!isXoveraConfigured()) {
+    return (
+      <Shell>
+        <p className={`${CARD} text-sm text-neutral-600`}>
+          The AI chat widget isn&rsquo;t available on this environment yet.
+        </p>
+      </Shell>
+    )
+  }
+
+  const install = await getInstallForCenter(center.id)
+  const isLive = install?.status === 'ready'
+  const live = isLive ? await liveStatus(install.externalId) : null
+
+  if (!install || install.status === 'disabled') {
+    return (
+      <Shell>
+        <section className={CARD}>
+          <ul className="flex flex-col gap-2">
+            {PITCH.map((line) => (
+              <li key={line} className="text-sm text-neutral-700">
+                {line}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-sm text-neutral-600">
+            It goes live on your help centre the moment you add it — there&rsquo;s no code to
+            copy and nothing to paste.
+          </p>
+          <div className="mt-5">
+            <AddWidgetButton
+              action={addAiWidget}
+              label={install ? 'Add the AI chat widget back' : 'Add AI chat widget'}
+            />
+          </div>
+          <p className="mt-4 text-xs text-neutral-500">
+            Starts on a free trial. If you want to keep it after that, you&rsquo;ll pick a plan
+            inside the customiser — it doesn&rsquo;t convert on its own.
+          </p>
+        </section>
+      </Shell>
+    )
+  }
+
+  if (install.status === 'provisioning') {
+    return (
+      <Shell>
+        <section className={CARD}>
+          <p className="text-sm font-medium">Setting up your widget…</p>
+          <p className="mt-2 text-sm text-neutral-600">
+            This usually takes a few seconds. Refresh the page in a moment.
+          </p>
+          {/* The status is stamped before we call Xovera, so a crash or a
+              dropped connection mid-provision would otherwise strand this
+              screen forever. Retrying is safe and is what unsticks it:
+              Xovera resumes the same install rather than starting a second. */}
+          <div className="mt-5">
+            <AddWidgetButton action={addAiWidget} label="Still waiting? Try again" />
+          </div>
+        </section>
+      </Shell>
+    )
+  }
+
+  if (install.status === 'failed') {
+    return (
+      <Shell>
+        <section className={CARD}>
+          <p className="text-sm font-medium text-red-900">We couldn&rsquo;t finish setting this up.</p>
+          <p className="mt-2 text-sm text-neutral-600">
+            Nothing was charged and nothing is on your help centre. Trying again picks up where it
+            got to rather than starting over.
+          </p>
+          <div className="mt-5">
+            <AddWidgetButton action={addAiWidget} label="Try again" />
+          </div>
+        </section>
+      </Shell>
+    )
+  }
+
+  return (
+    <Shell>
+      <section className={CARD}>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center gap-2 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-900">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-600" aria-hidden />
+            Live
+          </span>
+          <p className="text-sm text-neutral-600">
+            Answering questions on{' '}
+            <a href={`/hc/${center.slug}`} className="underline">
+              your help centre
+            </a>
+            .
+          </p>
+        </div>
+
+        {live?.usage && (
+          <p className="mt-4 text-2xl font-semibold tabular-nums">
+            {live.usage.conversationCount.toLocaleString()}{' '}
+            <span className="text-sm font-normal text-neutral-600">
+              {live.usage.conversationCount === 1 ? 'conversation' : 'conversations'} answered
+            </span>
+          </p>
+        )}
+      </section>
+
+      {live?.billing && <TrialNudge billing={live.billing} usage={live.usage} />}
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Customise it</h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Colours, logo, greeting, and where it sits on the page. Changes go live straight away.
+          </p>
+        </div>
+        <AiWidgetBuilder />
+      </section>
+
+      <section className="border-t border-neutral-200 pt-6">
+        <RemoveWidgetButton action={removeAiWidget} />
+      </section>
+    </Shell>
+  )
+}
+
+/**
+ * Reinforcement, not the only path — the builder shows its own trial banner with
+ * the actual upgrade CTA, and Xovera takes the payment. Leads with the
+ * conversation count because that is the number that makes the case.
+ */
+function TrialNudge({
+  billing,
+  usage,
+}: {
+  billing: NonNullable<InstallResponse['billing']>
+  usage: InstallResponse['usage']
+}) {
+  if (billing.plan !== 'trial') return null
+
+  const answered = usage?.conversationCount ?? 0
+
+  return (
+    <section
+      className={
+        billing.trialExpired
+          ? 'rounded-lg border border-amber-300 bg-amber-50 p-5'
+          : 'rounded-lg border border-neutral-200 bg-neutral-50 p-5'
+      }
+    >
+      <p className="text-sm font-medium">
+        {billing.trialExpired
+          ? 'Your trial has ended'
+          : `${billing.trialDaysRemaining} ${billing.trialDaysRemaining === 1 ? 'day' : 'days'} left on your trial`}
+      </p>
+      <p className="mt-2 text-sm text-neutral-700">
+        {answered > 0
+          ? `It has answered ${answered.toLocaleString()} ${answered === 1 ? 'question' : 'questions'} for your clients so far. `
+          : ''}
+        Pick a plan in the customiser below to keep it running — trials don&rsquo;t convert on
+        their own.
+      </p>
+    </section>
+  )
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-lg font-semibold">AI chat widget</h1>
+        <p className="mt-1 text-sm text-neutral-600">
+          A chat bubble on your help centre that answers GoHighLevel questions for your clients.
+        </p>
+      </div>
+      {children}
+    </div>
+  )
+}
