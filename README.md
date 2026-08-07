@@ -59,6 +59,18 @@ rm -rf .next/dev/cache .next/cache
 
 ## Deployment
 
+Nothing applies migrations for you. Vercel builds and deploys the app; it does
+not touch the database, and there is no CI step that does. A deploy carrying a
+new migration therefore ships code that expects a table the database has not
+got, which surfaces as `relation "..." does not exist` at runtime rather than
+as a failed build.
+
+Apply migrations against the linked project first, then deploy:
+
+```bash
+pnpm db:push
+```
+
 Serverless functions are pinned to `syd1` in `vercel.json` to sit in the same region as the
 Supabase project (`ap-southeast-2`). Without that they default to `iad1`, and every query
 crosses the Pacific — which cost roughly 7 seconds on a collection page. Verify with:
