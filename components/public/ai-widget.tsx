@@ -1,15 +1,22 @@
+import Script from 'next/script'
 import { cachedInstallForCenter } from '@/lib/ai-widget/repository'
 
 /**
  * The AI chat widget, on a help centre that has bought one.
  *
- * Rendered as a real script element from values validated at write time rather
- * than by injecting Xovera's HTML snippet: the snippet is a third-party string
- * and this renders on every page of every tenant's help centre, which is the
- * worst possible place for dangerouslySetInnerHTML. See lib/ai-widget/snippet.ts.
+ * Built from values validated at write time rather than by injecting Xovera's
+ * HTML snippet: the snippet is a third-party string and this renders on every
+ * page of every tenant's help centre, which is the worst possible place for
+ * dangerouslySetInnerHTML. See lib/ai-widget/snippet.ts.
  *
- * React hoists `async` scripts to the head and dedupes them by src, so this
- * loads once per page even though the layout re-renders on navigation.
+ * Loaded through next/script at afterInteractive, NOT as a bare <script async>.
+ * A bare one is hoisted into <head> by React 19 and lives inside the tree React
+ * reconciles, which gave a widget that drew itself but ignored input: it can
+ * initialise before <body> is complete, and anything it injects into the
+ * reconciled tree can be rendered over during hydration, leaving live-looking
+ * markup with dead listeners. afterInteractive injects once hydration is done
+ * and keeps the widget's DOM out of React's way — which is also the placement
+ * Xovera documents for the snippet, at the end of the body.
  *
  * The live/paused toggle in Xovera's builder is deliberately not mirrored here.
  * Xovera's own script decides whether to draw anything, and mirroring the flag
@@ -22,11 +29,14 @@ export async function AiWidget({ helpCenterId }: { helpCenterId: string }) {
   if (!install.scriptSrc || !install.widgetId || !install.widgetPublicKey) return null
 
   return (
-    <script
+    <Script
+      // Keyed on the widget so a centre that removes and re-adds one does not
+      // get the previous widget's script left in place by reuse.
+      id={`xovera-widget-${install.widgetId}`}
       src={install.scriptSrc}
       data-widget-id={install.widgetId}
       data-public-key={install.widgetPublicKey}
-      async
+      strategy="afterInteractive"
     />
   )
 }
