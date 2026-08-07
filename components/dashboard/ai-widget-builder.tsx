@@ -58,6 +58,27 @@ export function AiWidgetBuilder() {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Above the panel, not under it. Safari blocks third-party cookies by
+          default and Chrome is going the same way, so landing on Xovera's
+          "session has expired" screen is a normal outcome rather than a rare
+          one — and from out here we cannot detect it to react, because the
+          frame is cross-origin. The way out has to be visible before the
+          customer needs it. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+        <p className="text-sm text-neutral-600">
+          Seeing a padlock or “session has expired” below? That&rsquo;s your browser blocking
+          cookies in the panel, not a problem with your widget.
+        </p>
+        <button
+          type="button"
+          onClick={() => void openInTab()}
+          disabled={opening}
+          className="w-fit shrink-0 cursor-pointer rounded-md border border-neutral-400 bg-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+        >
+          {opening ? 'Opening…' : 'Open in a new tab'}
+        </button>
+      </div>
+
       <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
         {error ? (
           <p className="px-4 py-6 text-sm text-neutral-600">{error}</p>
@@ -71,19 +92,6 @@ export function AiWidgetBuilder() {
           <p className="px-4 py-6 text-sm text-neutral-500">Opening the customiser…</p>
         )}
       </div>
-
-      <p className="text-xs text-neutral-500">
-        Panel blank or asking you to sign in? Your browser is blocking third-party cookies.{' '}
-        <button
-          type="button"
-          onClick={() => void openInTab()}
-          disabled={opening}
-          className="cursor-pointer underline disabled:opacity-60"
-        >
-          {opening ? 'Opening…' : 'Open the customiser in a new tab'}
-        </button>{' '}
-        instead.
-      </p>
     </div>
   )
 }
