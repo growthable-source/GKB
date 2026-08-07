@@ -9,6 +9,12 @@ const NAV = [
   { href: '/dashboard/appearance', label: 'Appearance' },
 ]
 
+// Rendered as plain text, not links: nothing behind them exists yet, and a nav
+// item that looks clickable and does nothing is worse than one that is visibly
+// not ready. They sit here rather than only on the overview because this is
+// where someone goes looking for "where do I set my domain".
+const COMING_SOON = ['Domain', 'Team']
+
 /**
  * The customer surface.
  *
@@ -44,6 +50,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
             >
               {item.label}
             </Link>
+          ))}
+
+          {COMING_SOON.map((label) => (
+            <span
+              key={label}
+              aria-disabled="true"
+              title="Coming soon on Pro"
+              className="flex cursor-default items-center gap-1.5 text-sm text-neutral-400"
+            >
+              {label}
+              <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">
+                Pro
+              </span>
+            </span>
           ))}
         </nav>
       </header>

@@ -17,6 +17,8 @@ export type OwnedCenter = {
   bodyFont: string | null
   headingFont: string | null
   tilesPerRow: number
+  /** 'free' | 'pro'. Nothing sells Pro yet; the column gates the teasers. */
+  plan: string
 }
 
 /**
@@ -36,7 +38,7 @@ export const getOwnedCenter = cache(async (): Promise<OwnedCenter | null> => {
   const { data, error } = await serviceClient()
     .from('help_centers')
     .select(
-      'id, slug, name, primary_hex, secondary_hex, logo_url, favicon_url, settings, hero_style, hero_angle, font_family, heading_font, tiles_per_row',
+      'id, slug, name, primary_hex, secondary_hex, logo_url, favicon_url, settings, hero_style, hero_angle, font_family, heading_font, tiles_per_row, plan',
     )
     .eq('id', scoped.helpCenterId)
     .maybeSingle()
@@ -61,5 +63,6 @@ export const getOwnedCenter = cache(async (): Promise<OwnedCenter | null> => {
     bodyFont: data.font_family,
     headingFont: data.heading_font,
     tilesPerRow: data.tiles_per_row,
+    plan: data.plan,
   }
 })

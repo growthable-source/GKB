@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { listOwnerArticles, listOwnerCollections } from '@/lib/dashboard/owned-content'
+import { ProTeasers } from '@/components/dashboard/pro-teasers'
 
 export const metadata = { title: 'Your help centre — Growthable' }
 
@@ -60,6 +61,8 @@ export default async function DashboardPage({
           </Link>
         ))}
       </section>
+
+      {center.plan === 'free' && <ProTeasers />}
 
       <section>
         <h2 className="text-lg font-semibold">Recently edited</h2>
