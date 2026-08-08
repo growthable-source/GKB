@@ -36,6 +36,7 @@ export type Database = {
     Tables: {
       ai_widget_installs: {
         Row: {
+          billing_status: string
           created_at: string
           embed_snippet: string | null
           external_id: string
@@ -44,6 +45,8 @@ export type Database = {
           install_id: string | null
           script_src: string | null
           status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           trial_ends_at: string | null
           updated_at: string
           widget_id: string | null
@@ -51,6 +54,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          billing_status?: string
           created_at?: string
           embed_snippet?: string | null
           external_id: string
@@ -59,6 +63,8 @@ export type Database = {
           install_id?: string | null
           script_src?: string | null
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
           widget_id?: string | null
@@ -66,6 +72,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          billing_status?: string
           created_at?: string
           embed_snippet?: string | null
           external_id?: string
@@ -74,6 +81,8 @@ export type Database = {
           install_id?: string | null
           script_src?: string | null
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
           widget_id?: string | null

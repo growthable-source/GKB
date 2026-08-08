@@ -44,6 +44,9 @@ export async function addWidget(
       // Their branding is already here, so the builder opens on something that
       // looks like theirs rather than on Xovera's defaults.
       widget: { primaryColor: center.primaryHex, title: center.name },
+      // Where Xovera's trial-ended email sends them to upgrade: our
+      // dashboard, our checkout, our brand. Never a Xovera billing page.
+      metadata: { upgradeUrl: `${origin.replace(/\/+$/, '')}/dashboard/ai-agent` },
     })
 
     const scriptSrc = scriptSrcFrom(install.embedSnippet)

@@ -6,6 +6,7 @@ import { AiWidgetBuilder } from '@/components/dashboard/ai-widget-builder'
 import { AddWidgetButton, RemoveWidgetButton } from '@/components/dashboard/ai-widget-buttons'
 import { AiWidgetSnippet } from '@/components/dashboard/ai-widget-snippet'
 import { OpenPortalButton } from '@/components/dashboard/ai-widget-portal-button'
+import { UpgradeButton } from '@/components/dashboard/ai-widget-upgrade-button'
 import { addAiWidget, removeAiWidget } from './actions'
 
 export const metadata = { title: 'AI chat widget — Growthable' }
@@ -48,8 +49,12 @@ async function liveStatus(externalId: string): Promise<InstallResponse | null> {
   }
 }
 
-export default async function AiAgentPage() {
-  const center = await getOwnedCenter()
+export default async function AiAgentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ upgraded?: string }>
+}) {
+  const [center, { upgraded }] = await Promise.all([getOwnedCenter(), searchParams])
   if (!center) redirect('/get/details')
 
   if (!isXoveraConfigured()) {
@@ -93,8 +98,8 @@ export default async function AiAgentPage() {
             />
           </div>
           <p className="mt-4 text-xs text-neutral-500">
-            Starts on a free trial. If you want to keep it after that, you&rsquo;ll pick a plan
-            inside the customiser — it doesn&rsquo;t convert on its own.
+            Starts on a free 7-day trial with the full client portal. Keep it by upgrading right
+            here when you&rsquo;re ready — it never converts on its own.
           </p>
         </section>
       </Shell>
@@ -140,6 +145,12 @@ export default async function AiAgentPage() {
 
   return (
     <Shell>
+      {upgraded === '1' && (
+        <p className="rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-900">
+          You&rsquo;re upgraded — thanks! Your portal, weekly reports, and human handoff are
+          unlocked. It can take a minute for everything to switch over.
+        </p>
+      )}
       <section className={CARD}>
         <div className="flex flex-wrap items-center gap-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-900">
@@ -239,9 +250,13 @@ function TrialNudge({
         {answered > 0
           ? `It has answered ${answered.toLocaleString()} ${answered === 1 ? 'question' : 'questions'} for your clients so far. `
           : ''}
-        Pick a plan in the customiser below to keep it running — trials don&rsquo;t convert on
-        their own.
+        Upgrade to keep it running — trials don&rsquo;t convert on their own.
       </p>
+      <div className="mt-4">
+        <UpgradeButton
+          label={billing.trialExpired ? 'Upgrade and pick up where you left off' : 'Upgrade now'}
+        />
+      </div>
     </section>
   )
 }

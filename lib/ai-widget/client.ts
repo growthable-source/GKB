@@ -110,7 +110,7 @@ function baseUrl(): string {
 }
 
 async function call<T>(
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   options: { body?: unknown; timeoutMs?: number } = {},
 ): Promise<T> {
@@ -174,6 +174,9 @@ export type ProvisionRequest = {
     subtitle?: string
     welcomeMessage?: string
   }
+  /** Free-form context stored on the install. upgradeUrl is read back by
+   *  Xovera's trial-ended email so its CTA lands on OUR checkout page. */
+  metadata?: { upgradeUrl?: string }
 }
 
 export type ProvisionResponse = {
@@ -262,4 +265,15 @@ export function mintPortalLink(externalId: string): Promise<PortalLinkResponse> 
  */
 export function cancelInstall(externalId: string): Promise<unknown> {
   return call<unknown>('DELETE', `/api/v1/partner/installs/${encodeURIComponent(externalId)}`)
+}
+
+/**
+ * Asserts the customer's plan to Xovera after OUR checkout settles.
+ * 'canceled' returns them to the lapsed-trial state: widget answering,
+ * portal paused, nothing deleted.
+ */
+export function setPartnerPlan(externalId: string, plan: string): Promise<unknown> {
+  return call<unknown>('PUT', `/api/v1/partner/installs/${encodeURIComponent(externalId)}/plan`, {
+    body: { plan },
+  })
 }
