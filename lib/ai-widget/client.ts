@@ -191,6 +191,10 @@ export type InstallResponse = {
   status: InstallStatus
   failureReason: string | null
   widget: { id: string; isActive: boolean; embedSnippet: string } | null
+  /** The customer's Xovera client portal (CSAT, per-subaccount AI toggle,
+   *  query analysis, weekly report email). Optional: older installs have
+   *  one only after the next provision call backfills it. */
+  portal?: { slug: string; url: string } | null
   billing: { plan: string; trialDaysRemaining: number; trialExpired: boolean } | null
   usage: { conversationCount: number } | null
 }

@@ -166,6 +166,8 @@ export default async function AiAgentPage() {
 
       {live?.billing && <TrialNudge billing={live.billing} usage={live.usage} />}
 
+      {live?.portal && <PortalCard url={live.portal.url} />}
+
       <section className="flex flex-col gap-3">
         <div>
           <h2 className="text-lg font-semibold">Customise it</h2>
@@ -238,6 +240,54 @@ function TrialNudge({
           : ''}
         Pick a plan in the customiser below to keep it running — trials don&rsquo;t convert on
         their own.
+      </p>
+    </section>
+  )
+}
+
+/**
+ * The client portal that provisions alongside the widget.
+ *
+ * Everything listed is INCLUDED in the trial — the tease is the product
+ * itself, not a locked screenshot of it. The one named exception is the
+ * custom domain, which is the paid hook: by day 7 they have a portal
+ * full of their own data and the only thing missing is their name on the
+ * door. The invite email comes from Xovera, so this card also explains
+ * why that email is in their inbox.
+ */
+function PortalCard({ url }: { url: string }) {
+  const included = [
+    'Customer satisfaction ratings on every conversation',
+    'Turn the assistant on or off per client sub-account',
+    'AI analysis of what your clients are actually asking',
+    'A weekly email: conversations handled and time saved',
+  ]
+
+  return (
+    <section className={CARD}>
+      <h2 className="text-lg font-semibold">Your client portal</h2>
+      <p className="mt-1 text-sm text-neutral-600">
+        Set up with your widget — check your inbox for the sign-in invitation. Everything below is
+        included in your trial:
+      </p>
+      <ul className="mt-3 flex flex-col gap-1.5">
+        {included.map((line) => (
+          <li key={line} className="flex gap-2 text-sm text-neutral-700">
+            <span aria-hidden className="text-green-600">✓</span>
+            {line}
+          </li>
+        ))}
+      </ul>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-4 inline-block rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
+      >
+        Open your portal
+      </a>
+      <p className="mt-3 text-xs text-neutral-500">
+        On a paid plan the portal runs on your own domain — white-labelled for your agency.
       </p>
     </section>
   )
