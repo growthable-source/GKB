@@ -28,7 +28,9 @@ const CARD = 'rounded-lg border border-neutral-200 bg-white p-5'
 const PITCH = [
   'Answers your clients’ GoHighLevel questions instantly, day or night.',
   'Reads the full public GoHighLevel help centre — around 24,000 passages.',
-  'Says so and offers a human when it does not know, rather than inventing an answer.',
+  // No "offers a human" here: handoff is a paid Xovera feature and every
+  // widget starts on trial, so the free pitch must not promise it.
+  'Tells your clients honestly when it does not know, rather than inventing an answer.',
   'Goes on your help centre automatically, and you can paste it into your HighLevel agency too.',
 ]
 
