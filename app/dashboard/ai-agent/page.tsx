@@ -5,6 +5,7 @@ import { getInstall, isXoveraConfigured, type InstallResponse } from '@/lib/ai-w
 import { AiWidgetBuilder } from '@/components/dashboard/ai-widget-builder'
 import { AddWidgetButton, RemoveWidgetButton } from '@/components/dashboard/ai-widget-buttons'
 import { AiWidgetSnippet } from '@/components/dashboard/ai-widget-snippet'
+import { OpenPortalButton } from '@/components/dashboard/ai-widget-portal-button'
 import { addAiWidget, removeAiWidget } from './actions'
 
 export const metadata = { title: 'AI chat widget — Growthable' }
@@ -166,7 +167,7 @@ export default async function AiAgentPage() {
 
       {live?.billing && <TrialNudge billing={live.billing} usage={live.usage} />}
 
-      {live?.portal && <PortalCard url={live.portal.url} />}
+      {live?.portal && <PortalCard usage={live.usage} />}
 
       <section className="flex flex-col gap-3">
         <div>
@@ -245,17 +246,25 @@ function TrialNudge({
   )
 }
 
+/** "3h 30m"-style rendering, mirroring the portal report's own format. */
+function fmtMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
+}
+
 /**
  * The client portal that provisions alongside the widget.
  *
- * Everything listed is INCLUDED in the trial — the tease is the product
- * itself, not a locked screenshot of it. The one named exception is the
- * custom domain, which is the paid hook: by day 7 they have a portal
- * full of their own data and the only thing missing is their name on the
- * door. The invite email comes from Xovera, so this card also explains
- * why that email is in their inbox.
+ * Leads with the customer's own last-7-days numbers when there are any —
+ * numbers sell, links don't — and falls back to the included-features
+ * list before the widget has data. Everything listed is IN the trial;
+ * the one named exception, the custom domain, is the paid hook. The
+ * button signs them straight in (single-use SSO link) — no invite email
+ * to find, no password to set.
  */
-function PortalCard({ url }: { url: string }) {
+function PortalCard({ usage }: { usage: InstallResponse['usage'] }) {
   const included = [
     'Customer satisfaction ratings on every conversation',
     'Turn the assistant on or off per client sub-account',
@@ -263,29 +272,58 @@ function PortalCard({ url }: { url: string }) {
     'A weekly email: conversations handled and time saved',
   ]
 
+  const handled = usage?.aiHandledLast7Days ?? 0
+  const savedMinutes = usage?.timeSavedMinutesLast7Days ?? 0
+  const csat = usage?.csatAverage ?? null
+
   return (
     <section className={CARD}>
       <h2 className="text-lg font-semibold">Your client portal</h2>
-      <p className="mt-1 text-sm text-neutral-600">
-        Set up with your widget — check your inbox for the sign-in invitation. Everything below is
-        included in your trial:
-      </p>
-      <ul className="mt-3 flex flex-col gap-1.5">
-        {included.map((line) => (
-          <li key={line} className="flex gap-2 text-sm text-neutral-700">
-            <span aria-hidden className="text-green-600">✓</span>
-            {line}
-          </li>
-        ))}
-      </ul>
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-4 inline-block rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
-      >
-        Open your portal
-      </a>
+
+      {handled > 0 ? (
+        <>
+          <div className="mt-3 flex flex-wrap gap-6">
+            <div>
+              <p className="text-2xl font-semibold tabular-nums">{handled}</p>
+              <p className="text-sm text-neutral-600">
+                {handled === 1 ? 'conversation' : 'conversations'} handled this week
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl font-semibold tabular-nums">~{fmtMinutes(savedMinutes)}</p>
+              <p className="text-sm text-neutral-600">of support time saved</p>
+            </div>
+            {csat !== null && (usage?.csatCount ?? 0) > 0 && (
+              <div>
+                <p className="text-2xl font-semibold tabular-nums">{csat.toFixed(1)}★</p>
+                <p className="text-sm text-neutral-600">client satisfaction</p>
+              </div>
+            )}
+          </div>
+          <p className="mt-3 text-sm text-neutral-600">
+            The full breakdown — satisfaction by conversation, what your clients are asking, and
+            per-sub-account controls — is in your portal.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-neutral-600">
+            Set up with your widget, and all of it included in your trial:
+          </p>
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {included.map((line) => (
+              <li key={line} className="flex gap-2 text-sm text-neutral-700">
+                <span aria-hidden className="text-green-600">✓</span>
+                {line}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <div className="mt-4">
+        <OpenPortalButton />
+      </div>
       <p className="mt-3 text-xs text-neutral-500">
         On a paid plan the portal runs on your own domain — white-labelled for your agency.
       </p>

@@ -196,10 +196,17 @@ export type InstallResponse = {
    *  one only after the next provision call backfills it. */
   portal?: { slug: string; url: string } | null
   billing: { plan: string; trialDaysRemaining: number; trialExpired: boolean } | null
-  usage: { conversationCount: number } | null
+  usage: {
+    conversationCount: number
+    aiHandledLast7Days?: number
+    timeSavedMinutesLast7Days?: number
+    csatAverage?: number | null
+    csatCount?: number
+  } | null
 }
 
 export type BuilderLinkResponse = { builderUrl: string; expiresInSeconds: number }
+export type PortalLinkResponse = { portalUrl: string; expiresInSeconds: number }
 
 // --- Calls ------------------------------------------------------------------
 
@@ -233,6 +240,18 @@ export function mintBuilderLink(externalId: string): Promise<BuilderLinkResponse
 /** Live status, billing, and usage. The read behind the trial nudge. */
 export function getInstall(externalId: string): Promise<InstallResponse> {
   return call<InstallResponse>('GET', `/api/v1/partner/installs/${encodeURIComponent(externalId)}`)
+}
+
+/**
+ * A fresh, single-use portal sign-in URL — the customer lands in their
+ * portal already authenticated, no invite email or password required.
+ * Same rules as the builder link: mint per click, never cache.
+ */
+export function mintPortalLink(externalId: string): Promise<PortalLinkResponse> {
+  return call<PortalLinkResponse>(
+    'POST',
+    `/api/v1/partner/installs/${encodeURIComponent(externalId)}/portal-link`,
+  )
 }
 
 /**
