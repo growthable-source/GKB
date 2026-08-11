@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
+import { findEntitlementForCenter } from '@/lib/agency-plan/entitlement'
 import { getInstallForCenter } from '@/lib/ai-widget/repository'
 import { getInstall, isXoveraConfigured, type InstallResponse } from '@/lib/ai-widget/client'
 import { AiWidgetBuilder } from '@/components/dashboard/ai-widget-builder'
@@ -67,7 +68,10 @@ export default async function AiAgentPage({
     )
   }
 
-  const install = await getInstallForCenter(center.id)
+  const [install, agencyPlan] = await Promise.all([
+    getInstallForCenter(center.id),
+    findEntitlementForCenter(center.id).catch(() => null),
+  ])
   const isLive = install?.status === 'ready'
   const live = isLive ? await liveStatus(install.externalId) : null
 
@@ -98,8 +102,9 @@ export default async function AiAgentPage({
             />
           </div>
           <p className="mt-4 text-xs text-neutral-500">
-            Starts on a free 7-day trial with the full client portal. Keep it by upgrading right
-            here when you&rsquo;re ready — it never converts on its own.
+            {agencyPlan
+              ? 'Included in your Agency AI plan — no separate trial, no extra charge.'
+              : 'Starts on a free 7-day trial with the full client portal. Keep it by upgrading right here when you’re ready — it never converts on its own.'}
           </p>
         </section>
       </Shell>
@@ -176,7 +181,11 @@ export default async function AiAgentPage({
         )}
       </section>
 
-      {live?.billing && <TrialNudge billing={live.billing} usage={live.usage} />}
+      {/* An Agency AI centre's widget is asserted paid at add time, so Xovera
+          should never report 'trial' here — but if the assertion is still in
+          flight, a trial nudge with an upgrade button would double-charge
+          intent the $197 plan already covers. Suppressed outright. */}
+      {live?.billing && !agencyPlan && <TrialNudge billing={live.billing} usage={live.usage} />}
 
       {live?.portal && <PortalCard usage={live.usage} />}
 

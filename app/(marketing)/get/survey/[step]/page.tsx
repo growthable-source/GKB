@@ -34,7 +34,7 @@ export default async function SurveyStepPage({
           {/* No mk-eyebrow here: the progress rule beside it already carries
               the accent dash, and two in a row read as a mistake. */}
           <p className="mk-mono text-xs whitespace-nowrap uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
-            Step {position + 1} of 7
+            Step {position + 1} of {total + 2}
           </p>
           <div
             className="h-px flex-1 bg-[color:var(--mk-rule)]"

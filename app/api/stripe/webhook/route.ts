@@ -4,6 +4,10 @@ import { updateTag } from 'next/cache'
 import { AI_WIDGET_TAG } from '@/lib/cache/tags'
 import { serviceClient } from '@/lib/db/client'
 import { stripeClient, fulfillUpgrade, fulfillCancellation } from '@/lib/ai-widget/billing'
+import {
+  recordAgencySubscription,
+  revokeAgencySubscription,
+} from '@/lib/agency-plan/entitlement'
 
 /**
  * Stripe events for the AI widget subscription.
@@ -40,6 +44,27 @@ export async function POST(request: Request) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object
+
+        // The $197 Agency AI plan, sold on growthable.io. Email is the only
+        // join key the marketing checkout has; a session without one (possible
+        // in theory, never in practice) is logged and skipped, not errored.
+        if (session.metadata?.product === 'agency-plan') {
+          const email = session.customer_details?.email
+          if (!email) {
+            console.error(`agency-plan session ${session.id} arrived without an email`)
+            break
+          }
+          await recordAgencySubscription({
+            email,
+            stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
+            stripeSubscriptionId:
+              typeof session.subscription === 'string' ? session.subscription : session.id,
+          })
+          updateTag(AI_WIDGET_TAG)
+          console.log(`Agency plan recorded for ${email}`)
+          break
+        }
+
         // Only our own product's sessions. metadata is ours (set at
         // session creation), so anything else on this endpoint —
         // including future products on the same Stripe account — is
@@ -61,6 +86,16 @@ export async function POST(request: Request) {
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object
+
+        // Agency plan over: the marketing checkout stamps its subscriptions
+        // with the same product marker.
+        if (subscription.metadata?.product === 'agency-plan') {
+          await revokeAgencySubscription(subscription.id)
+          updateTag(AI_WIDGET_TAG)
+          console.log(`Agency plan subscription ${subscription.id} ended`)
+          break
+        }
+
         // Resolve by our stored subscription id first; metadata is the
         // fallback for events that arrive before our row was stamped.
         const { data } = await serviceClient()
