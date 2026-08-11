@@ -33,6 +33,8 @@ export type CrmContact = {
   marketingOptIn: boolean
   helpCenterSlug: string | null
   helpCenterUrl: string | null
+  /** Caller-supplied tags beyond the survey set (e.g. admin provisioning). */
+  extraTags?: string[]
 }
 
 export function isLeadConnectorConfigured(): boolean {
@@ -62,6 +64,7 @@ function tagsFor(contact: CrmContact): string[] {
   if (contact.subaccountCount) tags.push(`subaccounts: ${contact.subaccountCount}`)
   tags.push(contact.marketingOptIn ? 'marketing: opted in' : 'marketing: declined')
   if (contact.helpCenterSlug) tags.push('help-centre: live')
+  if (contact.extraTags) tags.push(...contact.extraTags)
 
   return tags.map((tag) => tag.toLowerCase())
 }
