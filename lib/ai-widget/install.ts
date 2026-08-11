@@ -4,6 +4,7 @@ import { authorize } from '@/lib/authz/authorize'
 import { requestOrigin } from '@/lib/signup/origin'
 import type { OwnedCenter } from '@/lib/dashboard/owned-center'
 import { XoveraError, cancelInstall, provisionInstall } from './client'
+import { applyEntitlementIfAny } from '@/lib/agency-plan/entitlement'
 import { externalIdFor } from './external-id'
 import { scriptSrcFrom } from './snippet'
 import { activeCustomDomain, helpCenterUrl } from './center-url'
@@ -66,6 +67,11 @@ export async function addWidget(
       embedSnippet: install.embedSnippet,
       trialEndsAt: install.trialEndsAt,
     })
+
+    // An Agency AI plan centre skips the widget's own trial: assert the paid
+    // Xovera plan now, so the customer never sees a countdown or an upgrade
+    // button for something their $197 subscription already covers.
+    await applyEntitlementIfAny(center.id, ownerEmail)
   } catch (error) {
     const message = failureMessage(error)
     await markFailed(center.id, error instanceof Error ? error.message : String(error))

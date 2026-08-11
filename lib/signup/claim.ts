@@ -7,6 +7,7 @@ import { DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 import { checkSlugAvailable, nextAvailableCenterSlug } from './slug-availability'
 import { findPendingSignupByEmail, updateSignup, type Signup } from './repository'
 import { deliverSignup } from './deliver'
+import { applyEntitlementIfAny } from '@/lib/agency-plan/entitlement'
 
 export type ClaimOutcome =
   | { kind: 'claimed'; slug: string; notice?: string }
@@ -113,6 +114,11 @@ export async function claimSignup(
     claimed_at: new Date().toISOString(),
     step: 'done',
   })
+
+  // Pay first, sign up after: a $197 Agency AI subscription bought on
+  // growthable.io before this centre existed is waiting on the email.
+  // Best-effort by design — a billing hiccup must never lose a signup.
+  await applyEntitlementIfAny(created.id, email)
 
   // Brand lookups are cached across requests with a TTL (lib/tenancy/active.ts).
   // Without this the owner's brand-new centre 404s at them for minutes.

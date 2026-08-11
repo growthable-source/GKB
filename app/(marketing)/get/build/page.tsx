@@ -6,9 +6,13 @@ import { getCachedArticleCollectionIndex, getCachedCollections } from '@/lib/con
 import { countArticlesPerCollection } from '@/lib/content/queries'
 import { slugify } from '@/lib/content/slug'
 import { submitBuild } from '../actions'
+import { SURVEY_STEPS } from '@/lib/signup/survey'
 import { BuilderForm } from '@/components/marketing/builder-form'
 
 export const metadata = { title: 'Build your help centre — Growthable' }
+
+// Details is step 1, the survey fills the middle, the builder is the last.
+const TOTAL_STEPS = SURVEY_STEPS.length + 2
 
 export default async function BuildPage() {
   const token = await readSignupToken()
@@ -41,7 +45,7 @@ export default async function BuildPage() {
     <main className="mx-auto flex max-w-6xl flex-col gap-7 px-5 py-12 sm:px-8 sm:py-16">
       <div className="flex flex-col gap-2">
         <p className="mk-eyebrow mk-mono text-xs uppercase tracking-[0.14em] text-[color:var(--mk-accent)]">
-          Step 7 of 7
+          Step {TOTAL_STEPS} of {TOTAL_STEPS}
         </p>
         <h1 className="text-3xl tracking-tight sm:text-4xl">Make it yours.</h1>
         <p className="max-w-xl text-[color:var(--mk-ink-soft)]">

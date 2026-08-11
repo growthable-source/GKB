@@ -8,9 +8,15 @@
 
 export type SurveyStep = {
   /** Matches the `signups.step` check constraint and the URL segment. */
-  id: 'role' | 'company_size' | 'agency_name' | 'subaccount_count' | 'opt_in'
+  id: 'role' | 'company_size' | 'country' | 'agency_name' | 'subaccount_count' | 'opt_in'
   /** The database column the answer lands in. */
-  column: 'role' | 'company_size' | 'agency_name' | 'subaccount_count' | 'marketing_opt_in'
+  column:
+    | 'role'
+    | 'company_size'
+    | 'country'
+    | 'agency_name'
+    | 'subaccount_count'
+    | 'marketing_opt_in'
   question: string
   hint?: string
   kind: 'choice' | 'text' | 'consent'
@@ -32,6 +38,20 @@ export const SURVEY_STEPS: SurveyStep[] = [
     question: 'How many people work there?',
     kind: 'choice',
     options: ['Just me', '2–5', '6–20', '21–50', '51–200', '200+'],
+  },
+  {
+    id: 'country',
+    column: 'country',
+    question: 'Where are you based?',
+    kind: 'choice',
+    options: [
+      'United States',
+      'Canada',
+      'United Kingdom',
+      'Australia',
+      'New Zealand',
+      'Somewhere else',
+    ],
   },
   {
     id: 'agency_name',

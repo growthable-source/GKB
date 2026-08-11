@@ -9,6 +9,7 @@ export type Signup = {
   full_name: string
   role: string | null
   company_size: string | null
+  country: string | null
   agency_name: string | null
   subaccount_count: string | null
   marketing_opt_in: boolean
@@ -26,7 +27,7 @@ export type Signup = {
 }
 
 const FIELDS =
-  'id, token, email, full_name, role, company_size, agency_name, subaccount_count, marketing_opt_in, consented_at, center_name, center_slug, branding, step, help_center_id, claimed_at, delivered_at, link_sent_at, created_at, updated_at'
+  'id, token, email, full_name, role, company_size, country, agency_name, subaccount_count, marketing_opt_in, consented_at, center_name, center_slug, branding, step, help_center_id, claimed_at, delivered_at, link_sent_at, created_at, updated_at'
 
 /**
  * Starts a signup, or returns the one this email already has open.

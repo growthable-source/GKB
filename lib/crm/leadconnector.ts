@@ -28,6 +28,7 @@ export type CrmContact = {
   agencyName: string | null
   role: string | null
   companySize: string | null
+  country: string | null
   subaccountCount: string | null
   marketingOptIn: boolean
   helpCenterSlug: string | null
@@ -57,6 +58,7 @@ function tagsFor(contact: CrmContact): string[] {
 
   if (contact.role) tags.push(`role: ${contact.role}`)
   if (contact.companySize) tags.push(`size: ${contact.companySize}`)
+  if (contact.country) tags.push(`country: ${contact.country}`)
   if (contact.subaccountCount) tags.push(`subaccounts: ${contact.subaccountCount}`)
   tags.push(contact.marketingOptIn ? 'marketing: opted in' : 'marketing: declined')
   if (contact.helpCenterSlug) tags.push('help-centre: live')
@@ -79,6 +81,7 @@ function customFieldsFor(contact: CrmContact): { id: string; value: string }[] {
   const values: Record<string, string | null> = {
     role: contact.role,
     company_size: contact.companySize,
+    country: contact.country,
     agency_name: contact.agencyName,
     subaccount_count: contact.subaccountCount,
     help_centre_url: contact.helpCenterUrl,

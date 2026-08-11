@@ -749,6 +749,47 @@ export type Database = {
         }
         Relationships: []
       }
+      agency_subscriptions: {
+        Row: {
+          created_at: string
+          email: string
+          help_center_id: string | null
+          id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          help_center_id?: string | null
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          help_center_id?: string | null
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_subscriptions_help_center_id_fkey"
+            columns: ["help_center_id"]
+            isOneToOne: false
+            referencedRelation: "help_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signups: {
         Row: {
           agency_name: string | null
@@ -758,6 +799,7 @@ export type Database = {
           claimed_at: string | null
           company_size: string | null
           consented_at: string | null
+          country: string | null
           created_at: string
           delivered_at: string | null
           email: string
@@ -780,6 +822,7 @@ export type Database = {
           claimed_at?: string | null
           company_size?: string | null
           consented_at?: string | null
+          country?: string | null
           created_at?: string
           delivered_at?: string | null
           email: string
@@ -802,6 +845,7 @@ export type Database = {
           claimed_at?: string | null
           company_size?: string | null
           consented_at?: string | null
+          country?: string | null
           created_at?: string
           delivered_at?: string | null
           email?: string
