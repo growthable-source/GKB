@@ -30,8 +30,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!actor.userId) redirect('/login?next=/dashboard')
 
   const hasOwnCenter = actor.memberships.some((membership) => membership.helpCenterId !== null)
+  const isStaff = actor.memberships.some((membership) => membership.helpCenterId === null)
   if (!hasOwnCenter) {
-    const isStaff = actor.memberships.some((membership) => membership.helpCenterId === null)
     if (isStaff) redirect('/admin/articles')
     redirect('/get/details')
   }
@@ -66,6 +66,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </span>
             </span>
           ))}
+
+          {/* Staff who also own a centre land here, not on the staff-only
+              redirect above — without this link the internal tools are
+              unreachable except by typing the URL. */}
+          {isStaff && (
+            <Link
+              href="/admin/provision"
+              className="ml-auto rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
+            >
+              Admin
+            </Link>
+          )}
         </nav>
       </header>
       <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
