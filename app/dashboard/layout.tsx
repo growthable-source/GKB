@@ -8,13 +8,16 @@ const NAV = [
   { href: '/dashboard/collections', label: 'Sections' },
   { href: '/dashboard/appearance', label: 'Appearance' },
   { href: '/dashboard/ai-agent', label: 'AI chat widget' },
+  // Real pages that gate themselves: Pro centres get the feature, free
+  // centres get the pitch — better funnel than a dead "coming soon" span.
+  { href: '/dashboard/team', label: 'Team' },
 ]
 
 // Rendered as plain text, not links: nothing behind them exists yet, and a nav
 // item that looks clickable and does nothing is worse than one that is visibly
 // not ready. They sit here rather than only on the overview because this is
 // where someone goes looking for "where do I set my domain".
-const COMING_SOON = ['Domain', 'Team']
+const COMING_SOON = ['Domain']
 
 /**
  * The customer surface.

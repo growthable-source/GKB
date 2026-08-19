@@ -21,7 +21,7 @@ export type SendLinkResult = { ok: true } | { ok: false; error: string }
  * them. A duplicate is not an error here: two tabs, or a resend, land in
  * exactly this path.
  */
-async function ensureUser(email: string): Promise<void> {
+export async function ensureUser(email: string): Promise<void> {
   const { error } = await serviceClient().auth.admin.createUser({
     email,
     email_confirm: false,
