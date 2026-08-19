@@ -38,7 +38,10 @@ const { helpCenterUrl } = await import('../lib/ai-widget/center-url')
 
 const dryRun = process.argv.includes('--dry-run')
 const originIdx = process.argv.indexOf('--origin')
-const origin = originIdx > -1 ? process.argv[originIdx + 1] : 'https://app.growthable.io'
+// The PUBLIC origin path-addressed centres serve from. app.growthable.io
+// was guessed here once and poisoned every registration's helpCenterUrl —
+// it hosts a different Growthable app entirely.
+const origin = originIdx > -1 ? process.argv[originIdx + 1] : 'https://whitelabelghl.growthable.io'
 
 if (!isXoveraConfigured()) {
   console.error('XOVERA_API_KEY is not set — nothing to do.')
