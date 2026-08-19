@@ -4,7 +4,8 @@ import { serviceClient } from '@/lib/db/client'
 import { parseHeroStyle } from '@/lib/tenancy/theme'
 import { EditCenterForm } from '@/components/admin/edit-center-form'
 import { DeleteCenterPanel } from '@/components/admin/delete-center-panel'
-import { editHelpCenter, deleteHelpCenter } from '../actions'
+import { SyncCenterButton } from '@/components/admin/sync-center-button'
+import { editHelpCenter, deleteHelpCenter, syncCenterFromXovera } from '../actions'
 
 export default async function EditCenterPage({
   params,
@@ -80,6 +81,19 @@ export default async function EditCenterPage({
           tilesPerRow: data.tiles_per_row,
         }}
       />
+
+      {!data.is_base && (
+        <div className="rounded-lg border border-neutral-200 bg-white p-5">
+          <h2 className="text-sm font-semibold">AI widget & plan</h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Unlocked this centre on Xovera? Pull the widget install and Pro flag across now —
+            it also happens automatically when the unlock push is configured.
+          </p>
+          <div className="mt-3">
+            <SyncCenterButton action={syncCenterFromXovera} centerId={data.id} />
+          </div>
+        </div>
+      )}
 
       {!data.is_base && (
         <DeleteCenterPanel

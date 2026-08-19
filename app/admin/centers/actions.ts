@@ -96,6 +96,35 @@ export async function editHelpCenter(
   return { saved: true }
 }
 
+export type SyncCenterState = { error?: string; ok?: string }
+
+/**
+ * Staff fallback for the automatic post-unlock push: pulls Xovera's
+ * install + plan state into this centre right now. Harmless to click
+ * any time — both halves are idempotent.
+ */
+export async function syncCenterFromXovera(
+  _prev: SyncCenterState | null,
+  formData: FormData,
+): Promise<SyncCenterState> {
+  await authorize('helpCenter.update', {})
+
+  const id = String(formData.get('id') ?? '')
+  if (!id) return { error: 'Missing help center id.' }
+  if (!isXoveraConfigured()) return { error: 'Xovera is not configured on this environment.' }
+
+  const { syncCenterWithXovera } = await import('@/lib/ai-widget/reconcile')
+  const result = await syncCenterWithXovera(id)
+  revalidatePath(`/admin/centers/${id}`)
+  return {
+    ok: result.recovered
+      ? 'Widget install recovered from Xovera — it will appear on the centre within 30 seconds.'
+      : result.refreshed
+        ? 'Synced — plan and install state refreshed from Xovera.'
+        : 'Nothing to sync — Xovera has no install for this centre yet.',
+  }
+}
+
 /**
  * Hard-deletes a help centre. Admin-area only (owner + staff), and the
  * form requires the centre's slug typed back exactly — deleting the

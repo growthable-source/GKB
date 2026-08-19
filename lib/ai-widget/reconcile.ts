@@ -38,6 +38,32 @@ export async function syncProFromXoveraPlan(helpCenterId: string, plan: string |
   if (error) console.error(`Could not set plan=pro for ${helpCenterId}: ${error.message}`)
 }
 
+/**
+ * One-call sync for a single centre, covering both cases: no local
+ * install row (recover it from Xovera) and an existing row whose plan
+ * changed (refresh the Pro flag). This is what the unlock push from
+ * Xovera and the admin "Sync" button call.
+ */
+export async function syncCenterWithXovera(
+  helpCenterId: string,
+): Promise<{ recovered: boolean; refreshed: boolean }> {
+  const existing = await getInstallForCenter(helpCenterId)
+  if (!existing) {
+    const recovered = await reconcileInstallForCenter(helpCenterId)
+    return { recovered, refreshed: recovered }
+  }
+  try {
+    const remote = await getInstall(externalIdFor(helpCenterId))
+    await syncProFromXoveraPlan(helpCenterId, remote.billing?.plan)
+    return { recovered: false, refreshed: true }
+  } catch (error) {
+    if (!(error instanceof XoveraError && error.code === 'not_found')) {
+      console.error(`Could not refresh Xovera state for ${helpCenterId}:`, error)
+    }
+    return { recovered: false, refreshed: false }
+  }
+}
+
 export async function reconcileInstallForCenter(helpCenterId: string): Promise<boolean> {
   if (!isXoveraConfigured()) return false
 
