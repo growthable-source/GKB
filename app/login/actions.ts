@@ -2,6 +2,7 @@
 
 import { serviceClient, userClient } from '@/lib/db/client'
 import { canSendEmail, sendEmail } from '@/lib/email/resend'
+import { requestOrigin } from '@/lib/signup/origin'
 import { loginLinkHtml, loginLinkSubject, loginLinkText } from '@/lib/email/login-link-email'
 
 /**
@@ -28,7 +29,10 @@ export async function sendMagicLink(
   const email = String(formData.get('email') ?? '').trim().toLowerCase()
   if (!email) return { error: 'Enter your email address.' }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  // The host the person is actually on — NOT the env var, which once
+  // pointed a production login email at the raw vercel.app project URL
+  // (name and all). See lib/signup/origin.ts for the trust argument.
+  const origin = await requestOrigin()
 
   if (!canSendEmail()) {
     if (process.env.NODE_ENV === 'production') {

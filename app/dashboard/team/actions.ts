@@ -6,6 +6,7 @@ import { serviceClient } from '@/lib/db/client'
 import { authorize, currentActor } from '@/lib/authz/authorize'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { canSendEmail, sendEmail } from '@/lib/email/resend'
+import { requestOrigin } from '@/lib/signup/origin'
 import { teamInviteHtml, teamInviteSubject, teamInviteText } from '@/lib/email/team-invite-email'
 
 /**
@@ -67,7 +68,7 @@ export async function inviteTeamMember(
   })
   if (error) return { error: `Could not create the invite: ${error.message}` }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const origin = await requestOrigin()
   const input = { centerName: center.name, role, inviteUrl: `${origin}/invite/${raw}` }
   try {
     await sendEmail({
