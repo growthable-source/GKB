@@ -25,8 +25,9 @@ loadEnv(path.join(ROOT, '.env.local'))
 
 // Import lib code after env is set; serviceClient reads env at call time.
 const { serviceClient } = await import('../lib/db/client')
-const { isXoveraConfigured } = await import('../lib/ai-widget/client')
-const { reconcileInstallForCenter } = await import('../lib/ai-widget/reconcile')
+const { isXoveraConfigured, getInstall, XoveraError } = await import('../lib/ai-widget/client')
+const { externalIdFor } = await import('../lib/ai-widget/external-id')
+const { reconcileInstallForCenter, syncProFromXoveraPlan } = await import('../lib/ai-widget/reconcile')
 
 if (!isXoveraConfigured()) {
   console.error('XOVERA_API_KEY is not set — nothing to do.')
@@ -51,7 +52,21 @@ async function main() {
   let unchanged = 0
   for (const center of centers ?? []) {
     if (center.is_base) continue
-    if (known.has(center.id)) { unchanged++; continue }
+
+    if (known.has(center.id)) {
+      // Row exists — but staff may have UNLOCKED the install since it
+      // was written, so refresh the Pro flag from Xovera's plan.
+      try {
+        const remote = await getInstall(externalIdFor(center.id))
+        await syncProFromXoveraPlan(center.id, remote.billing?.plan)
+      } catch (err) {
+        if (!(err instanceof XoveraError && err.code === 'not_found')) {
+          console.error(`could not refresh ${center.slug}:`, err instanceof Error ? err.message : err)
+        }
+      }
+      unchanged++
+      continue
+    }
 
     const ok = await reconcileInstallForCenter(center.id)
     if (ok) {
@@ -62,7 +77,7 @@ async function main() {
     }
   }
 
-  console.log(`\ndone: ${recovered} recovered, ${unchanged} unchanged`)
+  console.log(`\ndone: ${recovered} recovered, ${unchanged} refreshed/unchanged`)
 }
 
 await main()

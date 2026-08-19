@@ -16,9 +16,14 @@ describe('can', () => {
     expect(can(staff, 'collection.create', {})).toBe(true)
   })
 
-  it('lets owners delete help centers but not staff', () => {
+  it('lets owners and staff delete help centers, but never scoped roles', () => {
+    // Delete is an admin-area operation (the UI adds a typed-slug
+    // confirmation on top). Customers ask support; editors can't nuke
+    // their own centre.
     expect(can(owner, 'helpCenter.delete', { helpCenterId: 'h1' })).toBe(true)
-    expect(can(staff, 'helpCenter.delete', { helpCenterId: 'h1' })).toBe(false)
+    expect(can(staff, 'helpCenter.delete', { helpCenterId: 'h1' })).toBe(true)
+    expect(can(editor, 'helpCenter.delete', { helpCenterId: 'h1' })).toBe(false)
+    expect(can(contributor, 'helpCenter.delete', { helpCenterId: 'h1' })).toBe(false)
   })
 
   it('lets owners and staff create help centers but not editors or contributors', () => {

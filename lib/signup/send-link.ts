@@ -57,6 +57,13 @@ export async function sendConfirmationLink(
   }
 
   if (!canSendEmail()) {
+    // Local dev only (Mailpit catches signInWithOtp). In production a
+    // missing key must fail loudly — the silent fallback quietly moved
+    // every funnel email onto Supabase's sender once already.
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[signup] RESEND_API_KEY missing in production — refusing to fall back to Supabase mail')
+      return { ok: false, error: 'Confirmation emails are temporarily unavailable. Please try again shortly.' }
+    }
     const supabase = await userClient()
     const { error } = await supabase.auth.signInWithOtp({
       email: signup.email,

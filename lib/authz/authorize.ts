@@ -33,7 +33,10 @@ const ALLOWED: Record<Role, Action[]> = {
   staff: [
     'article.create', 'article.update', 'article.publish', 'article.delete',
     'collection.create', 'collection.update', 'collection.delete',
-    'helpCenter.create', 'helpCenter.update',
+    // delete is deliberately admin-area-only (owner + staff): customers
+    // ask support rather than nuking their own centre. The delete UI
+    // adds its own typed-slug confirmation on top.
+    'helpCenter.create', 'helpCenter.update', 'helpCenter.delete',
   ],
   editor: ['article.create', 'article.update', 'article.publish', 'helpCenter.update'],
   contributor: ['article.create', 'article.update'],

@@ -14,10 +14,29 @@
  * handles. Returns true when a row was recovered.
  */
 
+import { serviceClient } from '@/lib/db/client'
 import { getInstall, isXoveraConfigured, XoveraError } from './client'
 import { externalIdFor } from './external-id'
 import { scriptSrcFrom } from './snippet'
 import { getInstallForCenter, markProvisioning, markReady } from './repository'
+
+const PAID_XOVERA_PLANS = new Set(['starter', 'growth', 'scale'])
+
+/**
+ * Xovera's plan is the entitlement source of truth once staff can
+ * unlock installs from their admin side. A paid plan there lights up
+ * Pro here (custom domain, team) — the same flag the $197 Agency AI
+ * purchase sets via lib/agency-plan/entitlement.ts.
+ */
+export async function syncProFromXoveraPlan(helpCenterId: string, plan: string | null | undefined): Promise<void> {
+  if (!plan || !PAID_XOVERA_PLANS.has(plan)) return
+  const { error } = await serviceClient()
+    .from('help_centers')
+    .update({ plan: 'pro' })
+    .eq('id', helpCenterId)
+    .eq('plan', 'free')
+  if (error) console.error(`Could not set plan=pro for ${helpCenterId}: ${error.message}`)
+}
 
 export async function reconcileInstallForCenter(helpCenterId: string): Promise<boolean> {
   if (!isXoveraConfigured()) return false
@@ -38,6 +57,8 @@ export async function reconcileInstallForCenter(helpCenterId: string): Promise<b
   // A 'registered' row on Xovera's side has no widget yet; anything not
   // ready has nothing renderable to cache. Wait for the unlock.
   if (remote.status !== 'ready' || !remote.widget?.embedSnippet) return false
+
+  await syncProFromXoveraPlan(helpCenterId, remote.billing?.plan)
 
   // publicKey is a first-class field on newer Xovera deployments; fall
   // back to pulling it out of the snippet for older ones.

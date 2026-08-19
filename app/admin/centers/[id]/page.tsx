@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import { serviceClient } from '@/lib/db/client'
 import { parseHeroStyle } from '@/lib/tenancy/theme'
 import { EditCenterForm } from '@/components/admin/edit-center-form'
-import { editHelpCenter } from '../actions'
+import { DeleteCenterPanel } from '@/components/admin/delete-center-panel'
+import { editHelpCenter, deleteHelpCenter } from '../actions'
 
 export default async function EditCenterPage({
   params,
@@ -24,6 +25,22 @@ export default async function EditCenterPage({
   if (!data) notFound()
 
   const settings = (data.settings ?? {}) as { headline?: string; subtitle?: string }
+
+  // Danger-zone context: does deleting this centre also touch a live
+  // widget, and is Stripe still billing it? Both drive warnings only.
+  const [{ data: install }, { data: subscription }] = await Promise.all([
+    serviceClient()
+      .from('ai_widget_installs')
+      .select('status')
+      .eq('help_center_id', data.id)
+      .maybeSingle(),
+    serviceClient()
+      .from('agency_subscriptions')
+      .select('status')
+      .eq('help_center_id', data.id)
+      .in('status', ['trialing', 'active'])
+      .maybeSingle(),
+  ])
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,6 +80,15 @@ export default async function EditCenterPage({
           tilesPerRow: data.tiles_per_row,
         }}
       />
+
+      {!data.is_base && (
+        <DeleteCenterPanel
+          action={deleteHelpCenter}
+          center={{ id: data.id, slug: data.slug, name: data.name }}
+          hasWidget={!!install && install.status !== 'disabled'}
+          hasActiveSubscription={!!subscription}
+        />
+      )}
     </div>
   )
 }
