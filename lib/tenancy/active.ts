@@ -97,6 +97,10 @@ async function findByHostname(
     .from('custom_domains')
     .select(`help_centers!inner (${HELP_CENTER_FIELDS})`)
     .eq('hostname', hostname)
+    // Only verified domains serve traffic — the design spec always said
+    // so, and lib/ai-widget/center-url.ts already filtered; this reader
+    // predates the self-serve domain flow and never caught up.
+    .eq('status', 'active')
     .maybeSingle()
 
   if (error) throw new Error(`getActiveHelpCenter (custom_domains) failed: ${error.message}`)
