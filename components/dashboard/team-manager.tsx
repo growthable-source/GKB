@@ -13,12 +13,14 @@ const ROLE_HELP: Record<string, string> = {
 export function TeamManager({
   members,
   invites,
+  viewerIsOwner,
   inviteAction,
   revokeAction,
   removeAction,
 }: {
-  members: Array<{ userId: string; role: string; email: string; isSelf: boolean }>
+  members: Array<{ userId: string; role: string; email: string; isSelf: boolean; isOwner: boolean }>
   invites: Array<{ id: string; email: string; role: string; expiresAt: string }>
+  viewerIsOwner: boolean
   inviteAction: Action
   revokeAction: Action
   removeAction: Action
@@ -36,7 +38,14 @@ export function TeamManager({
         </p>
       </div>
 
-      {/* ── Invite ─────────────────────────────────────────────────── */}
+      {!viewerIsOwner && (
+        <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+          Only the help centre owner can invite or remove teammates. You can see who&rsquo;s on the team below.
+        </p>
+      )}
+
+      {/* ── Invite (owner only) ────────────────────────────────────── */}
+      {viewerIsOwner && (
       <form action={inviteFormAction} className="rounded-lg border border-neutral-200 bg-white p-5">
         <h2 className="text-sm font-semibold">Invite someone</h2>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -65,6 +74,7 @@ export function TeamManager({
           They get an email link that signs them in — no password to set up. Invites expire after 7 days.
         </p>
       </form>
+      )}
 
       {/* ── Members ────────────────────────────────────────────────── */}
       <div className="rounded-lg border border-neutral-200 bg-white">
@@ -72,9 +82,14 @@ export function TeamManager({
         <ul className="divide-y divide-neutral-100">
           {members.map((m) => (
             <li key={m.userId} className="flex items-center gap-3 px-5 py-3">
-              <span className="flex-1 text-sm">{m.email}{m.isSelf && <span className="ml-2 text-xs text-neutral-400">(you)</span>}</span>
+              <span className="flex-1 text-sm">
+                {m.email}
+                {m.isSelf && <span className="ml-2 text-xs text-neutral-400">(you)</span>}
+                {m.isOwner && <span className="ml-2 rounded-full bg-neutral-900 px-1.5 py-0.5 text-[10px] font-medium text-white">Owner</span>}
+              </span>
               <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs capitalize text-neutral-600">{m.role}</span>
-              {!m.isSelf && (
+              {/* Owner-only, and never on the owner row. */}
+              {viewerIsOwner && !m.isOwner && (
                 <form action={removeFormAction}>
                   <input type="hidden" name="userId" value={m.userId} />
                   <button type="submit" className="text-xs text-red-600 hover:underline">Remove</button>
@@ -86,8 +101,8 @@ export function TeamManager({
         {removeState?.error && <p className="px-5 pb-3 text-sm text-red-600">{removeState.error}</p>}
       </div>
 
-      {/* ── Pending invites ────────────────────────────────────────── */}
-      {invites.length > 0 && (
+      {/* ── Pending invites (owner only) ───────────────────────────── */}
+      {viewerIsOwner && invites.length > 0 && (
         <div className="rounded-lg border border-neutral-200 bg-white">
           <div className="border-b border-neutral-200 px-5 py-3 text-sm font-semibold">Pending invites</div>
           <ul className="divide-y divide-neutral-100">

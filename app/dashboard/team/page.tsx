@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { serviceClient } from '@/lib/db/client'
 import { currentActor } from '@/lib/authz/authorize'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
+import { centreOwnerUserId } from '@/lib/dashboard/centre-owner'
 import { TeamManager } from '@/components/dashboard/team-manager'
 import { inviteTeamMember, revokeInvite, removeTeamMember } from './actions'
 
@@ -43,6 +44,9 @@ export default async function TeamPage() {
       .order('created_at', { ascending: false }),
   ])
 
+  const ownerId = await centreOwnerUserId(center.id)
+  const viewerIsOwner = ownerId === actor.userId
+
   const members = await Promise.all(
     (memberships ?? []).map(async (m) => {
       const { data } = await db.auth.admin.getUserById(m.user_id)
@@ -51,6 +55,7 @@ export default async function TeamPage() {
         role: m.role,
         email: data?.user?.email ?? '(unknown)',
         isSelf: m.user_id === actor.userId,
+        isOwner: m.user_id === ownerId,
       }
     }),
   )
@@ -59,6 +64,7 @@ export default async function TeamPage() {
     <TeamManager
       members={members}
       invites={(invites ?? []).map((i) => ({ id: i.id, email: i.email, role: i.role, expiresAt: i.expires_at }))}
+      viewerIsOwner={viewerIsOwner}
       inviteAction={inviteTeamMember}
       revokeAction={revokeInvite}
       removeAction={removeTeamMember}

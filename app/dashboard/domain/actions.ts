@@ -4,8 +4,9 @@ import { updateTag } from 'next/cache'
 import { revalidatePath } from 'next/cache'
 import { BRAND_TAG } from '@/lib/cache/tags'
 import { serviceClient } from '@/lib/db/client'
-import { authorize } from '@/lib/authz/authorize'
+import { authorize, currentActor } from '@/lib/authz/authorize'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
+import { centreOwnerUserId } from '@/lib/dashboard/centre-owner'
 import {
   addDomainToVercel,
   getDomainStatus,
@@ -36,6 +37,13 @@ async function requireProCenter(): Promise<{ centerId: string } | { error: strin
   if (!center) return { error: 'No help centre on this account.' }
   if (center.plan !== 'pro') return { error: 'Custom domains are a Pro feature.' }
   await authorize('helpCenter.update', { helpCenterId: center.id })
+  // The domain is the centre's public identity — only the owner changes
+  // it, not every invited editor.
+  const actor = await currentActor()
+  const ownerId = await centreOwnerUserId(center.id)
+  if (!ownerId || ownerId !== actor.userId) {
+    return { error: 'Only the help centre owner can manage the custom domain.' }
+  }
   return { centerId: center.id }
 }
 

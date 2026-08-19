@@ -58,7 +58,7 @@ async function main() {
       // was written, so refresh the Pro flag from Xovera's plan.
       try {
         const remote = await getInstall(externalIdFor(center.id))
-        await syncProFromXoveraPlan(center.id, remote.billing?.plan)
+        await syncProFromXoveraPlan(center.id, remote.billing)
       } catch (err) {
         if (!(err instanceof XoveraError && err.code === 'not_found')) {
           console.error(`could not refresh ${center.slug}:`, err instanceof Error ? err.message : err)

@@ -204,7 +204,14 @@ export type InstallResponse = {
    *  query analysis, weekly report email). Optional: older installs have
    *  one only after the next provision call backfills it. */
   portal?: { slug: string; url: string } | null
-  billing: { plan: string; trialDaysRemaining: number; trialExpired: boolean } | null
+  billing: {
+    plan: string
+    /** THIS install's own workspace plan — key entitlements on this, not
+     *  `plan`, which is the owner's best plan across all their workspaces. */
+    workspacePlan?: string | null
+    trialDaysRemaining: number
+    trialExpired: boolean
+  } | null
   usage: {
     conversationCount: number
     aiHandledLast7Days?: number

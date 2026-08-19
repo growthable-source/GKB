@@ -38,6 +38,25 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     redirect('/login?error=' + encodeURIComponent('That invite expired — ask for a new one.'))
   }
 
+  // Consume the invite FIRST, atomically: a conditional update that
+  // only matches while accepted_at is still null. If it matches nothing
+  // (already accepted, or a concurrent tab won the race), stop before
+  // minting anything — this is what makes the link single-use instead
+  // of a reusable credential.
+  const { data: consumed, error: consumeError } = await db
+    .from('invites')
+    .update({ accepted_at: new Date().toISOString() })
+    .eq('id', invite.id)
+    .is('accepted_at', null)
+    .select('id')
+    .maybeSingle()
+  if (consumeError) {
+    redirect('/login?error=' + encodeURIComponent('We could not process the invite — try the link again.'))
+  }
+  if (!consumed) {
+    redirect('/login?error=' + encodeURIComponent('That invite was already used — sign in with your email.'))
+  }
+
   await ensureUser(invite.email)
 
   // generateLink also returns the user, which sidesteps needing a
@@ -45,6 +64,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   const { data, error } = await db.auth.admin.generateLink({ type: 'magiclink', email: invite.email })
   if (error || !data?.user || !data.properties?.hashed_token) {
     redirect('/login?error=' + encodeURIComponent('We could not sign you in — try the link again.'))
+  }
+
+  // Don't hand someone a second centre. If they already run one, drop
+  // them at login rather than creating a nondeterministic two-centre
+  // account. (inviteTeamMember blocks this too; belt and braces.)
+  const { data: priorMembership } = await db
+    .from('memberships')
+    .select('help_center_id')
+    .eq('user_id', data.user.id)
+    .not('help_center_id', 'is', null)
+    .maybeSingle()
+  if (priorMembership && priorMembership.help_center_id !== invite.help_center_id) {
+    redirect('/login?error=' + encodeURIComponent('This account already belongs to another help centre.'))
   }
 
   const { error: membershipError } = await db.from('memberships').insert({
@@ -57,8 +89,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   if (membershipError && !/duplicate|unique/i.test(membershipError.message)) {
     redirect('/login?error=' + encodeURIComponent(`Could not add you to the team: ${membershipError.message}`))
   }
-
-  await db.from('invites').update({ accepted_at: new Date().toISOString() }).eq('id', invite.id)
 
   redirect(
     `/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent('/dashboard')}`,

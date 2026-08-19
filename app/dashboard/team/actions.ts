@@ -5,8 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { serviceClient } from '@/lib/db/client'
 import { authorize, currentActor } from '@/lib/authz/authorize'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
+import { centreOwnerUserId } from '@/lib/dashboard/centre-owner'
 import { canSendEmail, sendEmail } from '@/lib/email/resend'
-import { requestOrigin } from '@/lib/signup/origin'
+import { authLinkOrigin } from '@/lib/auth/link-origin'
 import { teamInviteHtml, teamInviteSubject, teamInviteText } from '@/lib/email/team-invite-email'
 
 /**
@@ -24,13 +25,23 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export type TeamActionState = { error?: string; ok?: string }
 
-/** The signed-in customer's centre, verified Pro — or an error string. */
-async function requireProCenter(): Promise<{ center: { id: string; name: string; plan: string } } | { error: string }> {
+/**
+ * The signed-in customer's centre, verified Pro AND owned by them —
+ * team management is the OWNER's power, not every editor's. Without the
+ * ownership gate an invited editor could invite/remove/revoke, up to
+ * and including evicting the founder.
+ */
+async function requireProCenter(): Promise<{ center: { id: string; name: string; plan: string }; ownerId: string } | { error: string }> {
   const center = await getOwnedCenter()
   if (!center) return { error: 'No help centre on this account.' }
   if (center.plan !== 'pro') return { error: 'Team members are a Pro feature.' }
   await authorize('helpCenter.update', { helpCenterId: center.id })
-  return { center }
+  const actor = await currentActor()
+  const ownerId = await centreOwnerUserId(center.id)
+  if (!ownerId || ownerId !== actor.userId) {
+    return { error: 'Only the help centre owner can manage the team.' }
+  }
+  return { center, ownerId }
 }
 
 export async function inviteTeamMember(
@@ -48,6 +59,25 @@ export async function inviteTeamMember(
   if (!canSendEmail()) return { error: 'Email sending is not configured on this environment.' }
 
   const db = serviceClient()
+
+  // A user may own or help run exactly ONE centre (getOwnedCenter and
+  // the claim flow both assume it). Inviting someone who already has a
+  // centre-scoped membership would give them two, making their whole
+  // dashboard nondeterministic — reject it rather than create the mess.
+  const { data: invitedUsers } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  const invitedUserId = invitedUsers?.users.find((u) => u.email?.toLowerCase() === email)?.id
+  if (invitedUserId) {
+    const { data: theirMembership } = await db
+      .from('memberships')
+      .select('help_center_id')
+      .eq('user_id', invitedUserId)
+      .not('help_center_id', 'is', null)
+      .maybeSingle()
+    if (theirMembership && theirMembership.help_center_id !== center.id) {
+      return { error: 'That person already belongs to another help centre and cannot join a second.' }
+    }
+    if (theirMembership) return { error: 'That person is already a member of this help centre.' }
+  }
 
   // Re-inviting an address replaces the pending invite (fresh token +
   // clock) instead of stacking duplicates.
@@ -68,7 +98,7 @@ export async function inviteTeamMember(
   })
   if (error) return { error: `Could not create the invite: ${error.message}` }
 
-  const origin = await requestOrigin()
+  const origin = await authLinkOrigin()
   const input = { centerName: center.name, role, inviteUrl: `${origin}/invite/${raw}` }
   try {
     await sendEmail({
@@ -120,9 +150,11 @@ export async function removeTeamMember(
   const userId = String(formData.get('userId') ?? '')
   if (!userId) return { error: 'Missing user id.' }
 
-  const actor = await currentActor()
-  // Removing yourself would orphan the centre behind /get/details.
-  if (userId === actor.userId) return { error: 'You cannot remove yourself.' }
+  // Only the owner reaches here (requireProCenter), but never let even
+  // the owner delete the owner membership — that's the founder, and
+  // removing it orphans the centre behind /get/details with staff-only
+  // recovery.
+  if (userId === gate.ownerId) return { error: 'The help centre owner cannot be removed.' }
 
   const { error } = await serviceClient().from('memberships').delete()
     .eq('user_id', userId)

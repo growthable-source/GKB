@@ -91,6 +91,19 @@ export async function addDomainToVercel(hostname: string): Promise<void> {
   throw new VercelDomainError(json.error?.message ?? `Vercel returned ${status}`, status)
 }
 
+/**
+ * Triggers Vercel's own verification check for a domain that carried a
+ * TXT challenge (hostname already associated with another Vercel
+ * account/team — common when an agency moves an existing help.*
+ * subdomain). Polling GET never performs verification; this POST does.
+ * Best-effort: a 4xx just means "not satisfied yet", which the caller
+ * re-reads via getDomainStatus.
+ */
+async function triggerVerification(hostname: string): Promise<void> {
+  const projectId = process.env.VERCEL_PROJECT_ID
+  await call('POST', `/v9/projects/${projectId}/domains/${encodeURIComponent(hostname)}/verify`).catch(() => {})
+}
+
 /** Detaches the hostname. Absent is success. */
 export async function removeDomainFromVercel(hostname: string): Promise<void> {
   const projectId = process.env.VERCEL_PROJECT_ID
@@ -110,32 +123,45 @@ export async function removeDomainFromVercel(hostname: string): Promise<void> {
 export async function getDomainStatus(hostname: string): Promise<DomainStatus> {
   const projectId = process.env.VERCEL_PROJECT_ID
 
-  const [domainRes, configRes] = await Promise.all([
-    call<{
-      verified?: boolean
-      verification?: Array<{ type: string; domain: string; value: string }>
-      error?: { message?: string }
-    }>('GET', `/v9/projects/${projectId}/domains/${encodeURIComponent(hostname)}`),
-    call<{ misconfigured?: boolean }>('GET', `/v6/domains/${encodeURIComponent(hostname)}/config`),
-  ])
+  type DomainJson = {
+    verified?: boolean
+    verification?: Array<{ type: string; domain: string; value: string }>
+    error?: { message?: string }
+  }
+  type ConfigJson = { misconfigured?: boolean; recommendedIPv4?: string[]; recommendedCNAME?: string[] }
 
+  const domainPath = `/v9/projects/${projectId}/domains/${encodeURIComponent(hostname)}`
+  let domainRes = await call<DomainJson>('GET', domainPath)
   if (domainRes.status >= 300) {
     throw new VercelDomainError(domainRes.json.error?.message ?? `Vercel returned ${domainRes.status}`, domainRes.status)
   }
+
+  // If there's an outstanding TXT challenge, ask Vercel to check it —
+  // then re-read, so a customer who already created the record sees
+  // 'verified' on this same click instead of being stuck forever.
+  if (domainRes.json.verified !== true && (domainRes.json.verification ?? []).length > 0) {
+    await triggerVerification(hostname)
+    domainRes = await call<DomainJson>('GET', domainPath)
+  }
+
+  const configRes = await call<ConfigJson>('GET', `/v6/domains/${encodeURIComponent(hostname)}/config`)
 
   const instructions: DnsInstruction[] = []
   for (const v of domainRes.json.verification ?? []) {
     instructions.push({ type: v.type.toUpperCase(), name: v.domain, value: v.value, reason: 'verification' })
   }
-  // Routing records: apex points A at Vercel's anycast IP, subdomains
-  // CNAME at the shared edge alias. Only shown while DNS is wrong.
   if (configRes.json.misconfigured !== false) {
-    const isApex = hostname.split('.').length === 2
-    instructions.push(
-      isApex
-        ? { type: 'A', name: hostname, value: '76.76.21.21', reason: 'routing' }
-        : { type: 'CNAME', name: hostname, value: 'cname.vercel-dns.com', reason: 'routing' },
-    )
+    // Prefer Vercel's own recommended records; fall back to the known
+    // defaults. Apex detection is public-suffix-aware so multi-label
+    // registrable apexes (youragency.co.uk) aren't mis-told to CNAME
+    // at the zone apex, which DNS providers reject.
+    const recIPv4 = configRes.json.recommendedIPv4?.[0]
+    const recCNAME = configRes.json.recommendedCNAME?.[0]
+    if (isApexDomain(hostname)) {
+      instructions.push({ type: 'A', name: hostname, value: recIPv4 ?? '76.76.21.21', reason: 'routing' })
+    } else {
+      instructions.push({ type: 'CNAME', name: hostname, value: recCNAME ?? 'cname.vercel-dns.com', reason: 'routing' })
+    }
   }
 
   return {
@@ -143,4 +169,23 @@ export async function getDomainStatus(hostname: string): Promise<DomainStatus> {
     misconfigured: configRes.json.misconfigured !== false,
     instructions,
   }
+}
+
+// Two-label public suffixes where the registrable domain is 3 labels
+// (a CNAME cannot sit at the zone apex). Not exhaustive, but covers the
+// common agency cases; anything else falls back to the label-count
+// heuristic, which is correct for ordinary .com/.io/.net apexes.
+const TWO_LABEL_SUFFIXES = new Set([
+  'co.uk', 'org.uk', 'me.uk', 'ltd.uk', 'plc.uk',
+  'com.au', 'net.au', 'org.au', 'co.nz', 'org.nz',
+  'co.za', 'com.br', 'co.in', 'co.jp', 'com.mx', 'com.sg',
+])
+
+function isApexDomain(hostname: string): boolean {
+  const parts = hostname.split('.')
+  if (parts.length < 2) return true
+  const lastTwo = parts.slice(-2).join('.')
+  // e.g. youragency.co.uk → 3 labels, suffix 'co.uk' → apex.
+  if (TWO_LABEL_SUFFIXES.has(lastTwo)) return parts.length === 3
+  return parts.length === 2
 }

@@ -64,6 +64,10 @@ export async function currentActor(): Promise<Actor> {
     .from('memberships')
     .select('help_center_id, role')
     .eq('user_id', data.user.id)
+    // Deterministic order so getOwnedCenter (which takes the first
+    // scoped membership) always resolves the same centre for a user who
+    // somehow holds more than one — oldest first.
+    .order('created_at', { ascending: true })
 
   return {
     userId: data.user.id,
