@@ -193,7 +193,13 @@ export type ProvisionResponse = {
 export type InstallResponse = {
   status: InstallStatus
   failureReason: string | null
-  widget: { id: string; isActive: boolean; embedSnippet: string } | null
+  /** Present once provisioning has run; used by reconciliation to rebuild a
+   *  lost/never-written ai_widget_installs row from Xovera's state. */
+  installId?: string
+  workspaceId?: string | null
+  /** publicKey arrives as a field on newer Xovera deployments; older ones only
+   *  bake it into embedSnippet, so treat it as optional. */
+  widget: { id: string; isActive: boolean; embedSnippet: string; publicKey?: string } | null
   /** The customer's Xovera client portal (CSAT, per-subaccount AI toggle,
    *  query analysis, weekly report email). Optional: older installs have
    *  one only after the next provision call backfills it. */
@@ -211,6 +217,21 @@ export type InstallResponse = {
 export type BuilderLinkResponse = { builderUrl: string; expiresInSeconds: number }
 export type PortalLinkResponse = { portalUrl: string; expiresInSeconds: number }
 
+export type RegisterRequest = {
+  externalId: string
+  /** Same trust rule as ProvisionRequest.email — the authenticated owner. */
+  email: string
+  businessName: string
+  helpCenterUrl?: string
+  metadata?: Record<string, unknown>
+}
+
+export type RegisterResponse = {
+  installId: string
+  /** 'registered' on first call; the current status on any later call. */
+  status: string
+}
+
 // --- Calls ------------------------------------------------------------------
 
 /**
@@ -225,6 +246,17 @@ export function provisionInstall(request: ProvisionRequest): Promise<ProvisionRe
     body: request,
     timeoutMs: PROVISION_TIMEOUT_MS,
   })
+}
+
+/**
+ * Makes a help centre KNOWN to Xovera without provisioning anything — no
+ * account, no workspace, no trial clock, no emails on their side. Purely so
+ * the centre appears on Xovera's admin Help Center page, where Growthable
+ * staff can provision + unlock it later. Idempotent in every state, so it is
+ * safe to fire from the signup funnel and from backfills alike.
+ */
+export function registerInstall(request: RegisterRequest): Promise<RegisterResponse> {
+  return call<RegisterResponse>('POST', '/api/v1/partner/registrations', { body: request })
 }
 
 /**

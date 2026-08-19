@@ -8,6 +8,7 @@ import { checkSlugAvailable, nextAvailableCenterSlug } from './slug-availability
 import { findPendingSignupByEmail, updateSignup, type Signup } from './repository'
 import { deliverSignup } from './deliver'
 import { applyEntitlementIfAny } from '@/lib/agency-plan/entitlement'
+import { registerCenterWithXovera } from '@/lib/ai-widget/register'
 
 export type ClaimOutcome =
   | { kind: 'claimed'; slug: string; notice?: string }
@@ -119,6 +120,17 @@ export async function claimSignup(
   // growthable.io before this centre existed is waiting on the email.
   // Best-effort by design — a billing hiccup must never lose a signup.
   await applyEntitlementIfAny(created.id, email)
+
+  // Make the centre visible on Xovera's admin Help Center page from day
+  // one (registration only — nothing is provisioned, the customer gets
+  // no emails). Same await-but-never-throw contract as deliverSignup.
+  await registerCenterWithXovera({
+    helpCenterId: created.id,
+    slug: created.slug,
+    name,
+    email,
+    origin,
+  })
 
   // Brand lookups are cached across requests with a TTL (lib/tenancy/active.ts).
   // Without this the owner's brand-new centre 404s at them for minutes.

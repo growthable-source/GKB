@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { findEntitlementForCenter } from '@/lib/agency-plan/entitlement'
 import { getInstallForCenter } from '@/lib/ai-widget/repository'
+import { reconcileInstallForCenter } from '@/lib/ai-widget/reconcile'
 import { getInstall, isXoveraConfigured, type InstallResponse } from '@/lib/ai-widget/client'
 import { AiWidgetBuilder } from '@/components/dashboard/ai-widget-builder'
 import { AddWidgetButton, RemoveWidgetButton } from '@/components/dashboard/ai-widget-buttons'
@@ -68,12 +69,21 @@ export default async function AiAgentPage({
     )
   }
 
-  const [install, agencyPlan] = await Promise.all([
+  const [storedInstall, agencyPlan] = await Promise.all([
     getInstallForCenter(center.id),
     findEntitlementForCenter(center.id).catch(() => null),
   ])
+  let install = storedInstall
+  // No local row doesn't always mean no install: Growthable staff can
+  // provision + unlock from Xovera's admin side, which never touches our
+  // cache. Ask Xovera before showing the "Add AI chat widget" pitch for
+  // a widget that already exists.
+  if (!install) {
+    const recovered = await reconcileInstallForCenter(center.id)
+    if (recovered) install = await getInstallForCenter(center.id)
+  }
   const isLive = install?.status === 'ready'
-  const live = isLive ? await liveStatus(install.externalId) : null
+  const live = install && isLive ? await liveStatus(install.externalId) : null
 
   // Xovera's live copy wins over ours: the customer may have changed the widget
   // in the builder since we stored it. Falls back to the stored one so the
