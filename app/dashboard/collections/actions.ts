@@ -8,6 +8,7 @@ import { slugify } from '@/lib/content/slug'
 import { nextAvailableSlug } from '@/lib/content/unique-slug'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { assertOwnsCollection } from '@/lib/dashboard/owned-content'
+import { pushKnowledgeRefresh } from '@/lib/ai-widget/knowledge-push'
 
 export type CollectionState = { error?: string }
 
@@ -76,6 +77,7 @@ export async function renameOwnerCollection(
   if (error) return { error: `Could not rename the section: ${error.message}` }
 
   bust()
+  await pushKnowledgeRefresh(center.id)
   return {}
 }
 
@@ -103,4 +105,5 @@ export async function deleteOwnerCollection(collectionId: string): Promise<void>
   if (error) throw new Error(`Could not delete the section: ${error.message}`)
 
   bust()
+  await pushKnowledgeRefresh(center.id)
 }

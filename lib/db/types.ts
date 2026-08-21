@@ -43,6 +43,7 @@ export type Database = {
           failure_reason: string | null
           help_center_id: string
           install_id: string | null
+          knowledge_pushed_at: string | null
           script_src: string | null
           status: string
           stripe_customer_id: string | null
@@ -61,6 +62,7 @@ export type Database = {
           failure_reason?: string | null
           help_center_id: string
           install_id?: string | null
+          knowledge_pushed_at?: string | null
           script_src?: string | null
           status?: string
           stripe_customer_id?: string | null
@@ -79,6 +81,7 @@ export type Database = {
           failure_reason?: string | null
           help_center_id?: string
           install_id?: string | null
+          knowledge_pushed_at?: string | null
           script_src?: string | null
           status?: string
           stripe_customer_id?: string | null

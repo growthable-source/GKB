@@ -284,6 +284,27 @@ export function getInstall(externalId: string): Promise<InstallResponse> {
   return call<InstallResponse>('GET', `/api/v1/partner/installs/${encodeURIComponent(externalId)}`)
 }
 
+export type RefreshKnowledgeResponse = {
+  /** How many re-crawl runs were queued (0 = nothing synced for this centre yet). */
+  queued: number
+  /** How many article sources exist for the install. */
+  sources: number
+}
+
+/**
+ * Ask Xovera to re-crawl this centre's help-content into the AI widget's
+ * knowledge — the near-real-time counterpart to its ~7-day auto-recrawl.
+ * Call it after a customer publishes/edits an article; the widget
+ * reflects the change within about a minute. Cheap + coalescing on
+ * Xovera's side; debounce per-centre on ours (lib/ai-widget/knowledge-push).
+ */
+export function refreshKnowledge(externalId: string): Promise<RefreshKnowledgeResponse> {
+  return call<RefreshKnowledgeResponse>(
+    'POST',
+    `/api/v1/partner/installs/${encodeURIComponent(externalId)}/refresh-knowledge`,
+  )
+}
+
 /**
  * A fresh, single-use portal sign-in URL — the customer lands in their
  * portal already authenticated, no invite email or password required.

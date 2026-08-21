@@ -11,6 +11,7 @@ import { nextAvailableSlug } from '@/lib/content/unique-slug'
 import { indexOwnedArticle } from '@/lib/search/index-article'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { assertOwnsArticle } from '@/lib/dashboard/owned-content'
+import { pushKnowledgeRefresh } from '@/lib/ai-widget/knowledge-push'
 import type { Json } from '@/lib/db/types'
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }
@@ -83,6 +84,8 @@ export async function saveOwnerArticle(input: {
 
   await indexOwnedArticle(input.articleId)
   bustContent()
+  // Content changed for this centre — refresh the AI widget's knowledge.
+  await pushKnowledgeRefresh(center.id)
   revalidatePath('/dashboard/articles')
 }
 
@@ -113,6 +116,8 @@ export async function publishOwnerArticle(articleId: string): Promise<void> {
 
   await indexOwnedArticle(articleId)
   bustContent()
+  // Content changed for this centre — refresh the AI widget's knowledge.
+  await pushKnowledgeRefresh(center.id)
   revalidatePath('/dashboard/articles')
 }
 
@@ -130,6 +135,8 @@ export async function unpublishOwnerArticle(articleId: string): Promise<void> {
   // Drops it from the index too, so search cannot lead to a 404.
   await indexOwnedArticle(articleId)
   bustContent()
+  // Content changed for this centre — refresh the AI widget's knowledge.
+  await pushKnowledgeRefresh(center.id)
   revalidatePath('/dashboard/articles')
 }
 
@@ -141,6 +148,8 @@ export async function deleteOwnerArticle(articleId: string): Promise<void> {
   if (error) throw new Error(`Could not delete the article: ${error.message}`)
 
   bustContent()
+  // Content changed for this centre — refresh the AI widget's knowledge.
+  await pushKnowledgeRefresh(center.id)
   revalidatePath('/dashboard/articles')
   redirect('/dashboard/articles')
 }
@@ -175,5 +184,8 @@ export async function setSharedArticleHidden(
   if (error) throw new Error(`Could not change that article's visibility: ${error.message}`)
 
   updateTag(EXCLUSIONS_TAG)
+  // Showing/hiding a shared article changes what the public centre — and
+  // therefore the crawl — sees.
+  await pushKnowledgeRefresh(center.id)
   revalidatePath('/dashboard/articles')
 }
