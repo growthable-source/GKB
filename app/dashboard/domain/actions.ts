@@ -32,6 +32,20 @@ const RESERVED_SUFFIXES = ['growthable.io', 'xovera.io', 'vercel.app']
 
 export type DomainActionState = { error?: string; ok?: string }
 
+/**
+ * Vercel's own wording is right for things the customer can act on (a
+ * hostname another account already claimed). Credential failures are
+ * ours — telling someone staring at their DNS panel "Not authorized"
+ * sends them hunting for a problem that isn't theirs.
+ */
+function domainErrorMessage(err: unknown, verb: 'attach' | 'check' | 'detach'): string {
+  if (err instanceof VercelDomainError && err.isCredentialProblem) {
+    return 'Custom domains are not set up correctly on this environment — our hosting credentials were rejected. Nothing to fix on your side; please contact support.'
+  }
+  const detail = err instanceof VercelDomainError ? err.message : String(err)
+  return `Could not ${verb} the domain: ${detail}`
+}
+
 async function requireProCenter(): Promise<{ centerId: string } | { error: string }> {
   const center = await getOwnedCenter()
   if (!center) return { error: 'No help centre on this account.' }
@@ -69,7 +83,7 @@ export async function addCustomDomain(
 
   const { data: existing } = await db
     .from('custom_domains')
-    .select('help_center_id')
+    .select('help_center_id, status')
     .eq('hostname', hostname)
     .maybeSingle()
   if (existing && existing.help_center_id !== gate.centerId) {
@@ -87,8 +101,20 @@ export async function addCustomDomain(
   try {
     await addDomainToVercel(hostname)
   } catch (err) {
-    const detail = err instanceof VercelDomainError ? err.message : String(err)
-    return { error: `Could not attach the domain: ${detail}` }
+    // A definitive HTTP rejection means the attach did NOT happen, so the
+    // pending row above is a lie — and worse, it holds the hostname
+    // against every other centre (see the conflict check). Undo it,
+    // restoring any state this row had before. A transport failure
+    // (status null) leaves the outcome genuinely unknown, so that row
+    // stays put to be retried, which is what it's there for.
+    if (err instanceof VercelDomainError && err.status !== null) {
+      if (existing) {
+        await db.from('custom_domains').update({ status: existing.status }).eq('hostname', hostname)
+      } else {
+        await db.from('custom_domains').delete().eq('hostname', hostname)
+      }
+    }
+    return { error: domainErrorMessage(err, 'attach') }
   }
 
   await db.from('custom_domains').update({ status: 'verifying' }).eq('hostname', hostname)
@@ -117,8 +143,7 @@ export async function checkCustomDomain(): Promise<DomainActionState> {
   try {
     status = await getDomainStatus(row.hostname)
   } catch (err) {
-    const detail = err instanceof VercelDomainError ? err.message : String(err)
-    return { error: `Could not check the domain: ${detail}` }
+    return { error: domainErrorMessage(err, 'check') }
   }
 
   if (status.verified && !status.misconfigured) {
@@ -156,8 +181,7 @@ export async function removeCustomDomain(): Promise<DomainActionState> {
     try {
       await removeDomainFromVercel(row.hostname)
     } catch (err) {
-      const detail = err instanceof VercelDomainError ? err.message : String(err)
-      return { error: `Could not detach the domain: ${detail}` }
+      return { error: domainErrorMessage(err, 'detach') }
     }
   }
 

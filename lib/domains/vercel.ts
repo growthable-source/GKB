@@ -12,24 +12,37 @@
  * isVercelDomainsConfigured() gates the feature off rather than
  * throwing (the repo-wide convention).
  *
- * Env: VERCEL_TOKEN (create at vercel.com/account/tokens),
+ * Env: VERCEL_TOKEN (create at vercel.com/account/tokens — mind the
+ *        expiry; an expired token 403s on every call),
  *      VERCEL_PROJECT_ID (the gkb project id),
- *      VERCEL_TEAM_ID (optional; required when the project lives in a
- *      team, which ours does).
+ *      VERCEL_TEAM_ID (the team owning the project). All three are
+ *        required: the API resolves scope from teamId, so without it a
+ *        perfectly good token still 403s "Not authorized" — which the
+ *        customer reads as a problem with their DNS.
  */
 
 const API = 'https://api.vercel.com'
 
 export function isVercelDomainsConfigured(): boolean {
-  return Boolean(process.env.VERCEL_TOKEN && process.env.VERCEL_PROJECT_ID)
+  return Boolean(
+    process.env.VERCEL_TOKEN && process.env.VERCEL_PROJECT_ID && process.env.VERCEL_TEAM_ID,
+  )
 }
 
 export class VercelDomainError extends Error {
   readonly status: number | null
+  /**
+   * 401/403 mean our token is expired, revoked, or scoped to the wrong
+   * team — never something the customer can fix. Callers surface these
+   * as "not configured on this environment" rather than leaking
+   * Vercel's bare "Not authorized" into a customer-facing dashboard.
+   */
+  readonly isCredentialProblem: boolean
   constructor(message: string, status: number | null = null) {
     super(message)
     this.name = 'VercelDomainError'
     this.status = status
+    this.isCredentialProblem = status === 401 || status === 403
   }
 }
 
