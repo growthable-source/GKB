@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { serviceClient } from '@/lib/db/client'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { getDomainStatus, isVercelDomainsConfigured, type DnsInstruction } from '@/lib/domains/vercel'
+import { reportDomainFailure } from '@/lib/domains/messages'
 import { DomainManager } from '@/components/dashboard/domain-manager'
 import { addCustomDomain, checkCustomDomain, removeCustomDomain } from './actions'
 
@@ -39,13 +40,17 @@ export default async function DomainPage() {
     .maybeSingle()
 
   // Live DNS truth for a not-yet-active domain, best-effort — a Vercel
-  // blip should degrade to "press Check", not error the page.
+  // blip should degrade to an explanation, not error the page. What it
+  // must never do is fall through silently: that rendered "create these
+  // DNS records" above an empty table, which sent customers looking for
+  // records that were never going to appear.
   let instructions: DnsInstruction[] = []
+  let instructionsError: string | null = null
   if (row && row.status !== 'active' && isVercelDomainsConfigured()) {
     try {
       instructions = (await getDomainStatus(row.hostname)).instructions
-    } catch {
-      /* the Check button surfaces errors interactively */
+    } catch (err) {
+      instructionsError = reportDomainFailure(err, 'check', row.hostname)
     }
   }
 
@@ -54,6 +59,7 @@ export default async function DomainPage() {
       configured={isVercelDomainsConfigured()}
       domain={row ? { hostname: row.hostname, status: row.status, verifiedAt: row.verified_at } : null}
       instructions={instructions}
+      instructionsError={instructionsError}
       addAction={addCustomDomain}
       checkAction={checkCustomDomain}
       removeAction={removeCustomDomain}

@@ -28,11 +28,23 @@ export type AgencyEntitlement = {
   stripe_subscription_id: string
   status: string
   help_center_id: string | null
+  trial_end: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+  amount: number | null
+  currency: string | null
+  billing_interval: string | null
 }
 
-const FIELDS = 'id, email, stripe_customer_id, stripe_subscription_id, status, help_center_id'
+// One string literal, not a concatenation — supabase-js parses this at the
+// type level, and a computed string degrades the row to an error type.
+const FIELDS =
+  'id, email, stripe_customer_id, stripe_subscription_id, status, help_center_id, trial_end, current_period_end, cancel_at_period_end, amount, currency, billing_interval'
 
-const ENTITLED = ['trialing', 'active']
+// past_due keeps access: Stripe smart-retries a failing card for days, and
+// yanking the product mid-dunning punishes a customer whose bank hiccuped.
+// Access ends only when Stripe gives up (customer.subscription.deleted).
+const ENTITLED = ['trialing', 'active', 'past_due']
 
 /** The live entitlement for an email, if any. */
 export async function findEntitlementByEmail(email: string): Promise<AgencyEntitlement | null> {

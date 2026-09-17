@@ -754,33 +754,60 @@ export type Database = {
       }
       agency_subscriptions: {
         Row: {
+          amount: number | null
+          billing_interval: string | null
+          cancel_at_period_end: boolean
+          canceled_email_sent_at: string | null
           created_at: string
+          currency: string | null
+          current_period_end: string | null
           email: string
           help_center_id: string | null
           id: string
+          reminder_email_sent_at: string | null
+          started_email_sent_at: string | null
           status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string
+          trial_end: string | null
           updated_at: string
         }
         Insert: {
+          amount?: number | null
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
+          canceled_email_sent_at?: string | null
           created_at?: string
+          currency?: string | null
+          current_period_end?: string | null
           email: string
           help_center_id?: string | null
           id?: string
+          reminder_email_sent_at?: string | null
+          started_email_sent_at?: string | null
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id: string
+          trial_end?: string | null
           updated_at?: string
         }
         Update: {
+          amount?: number | null
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
+          canceled_email_sent_at?: string | null
           created_at?: string
+          currency?: string | null
+          current_period_end?: string | null
           email?: string
           help_center_id?: string | null
           id?: string
+          reminder_email_sent_at?: string | null
+          started_email_sent_at?: string | null
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string
+          trial_end?: string | null
           updated_at?: string
         }
         Relationships: [

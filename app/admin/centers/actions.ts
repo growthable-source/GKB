@@ -211,13 +211,16 @@ export async function deleteHelpCenter(
   }
 
   // 2. Vercel — detach every custom domain before the row (and its
-  // hostnames) disappear.
-  const { data: domains } = await db
+  // hostnames) disappear. A pending domain was never confirmed onto the
+  // project, so it has nothing to strand and must not be able to block
+  // a delete when Vercel is unhappy with us.
+  const { data: allDomains } = await db
     .from('custom_domains')
-    .select('hostname')
+    .select('hostname, status')
     .eq('help_center_id', center.id)
+  const domains = (allDomains ?? []).filter((d) => d.status !== 'pending')
   if (isVercelDomainsConfigured()) {
-    for (const d of domains ?? []) {
+    for (const d of domains) {
       try {
         await removeDomainFromVercel(d.hostname)
       } catch (err) {
@@ -227,7 +230,7 @@ export async function deleteHelpCenter(
         }
       }
     }
-  } else if ((domains ?? []).length > 0) {
+  } else if (domains.length > 0) {
     return {
       error: 'This centre has a custom domain but Vercel is not configured here — deleting would leave the hostname attached and serving. Configure Vercel domains, or remove the domain first.',
     }

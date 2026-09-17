@@ -17,6 +17,7 @@ export function DomainManager({
   configured,
   domain,
   instructions,
+  instructionsError,
   addAction,
   checkAction,
   removeAction,
@@ -24,6 +25,8 @@ export function DomainManager({
   configured: boolean
   domain: { hostname: string; status: string; verifiedAt: string | null } | null
   instructions: DnsInstruction[]
+  /** Why the DNS records are missing, when we couldn't fetch them. */
+  instructionsError?: string | null
   addAction: Action
   checkAction: Action
   removeAction: Action
@@ -93,11 +96,21 @@ export function DomainManager({
           </p>
         ) : (
           <>
-            <p className="mt-2 max-w-xl text-sm text-neutral-600">
-              Create {instructions.length === 1 ? 'this DNS record' : 'these DNS records'} with your
-              domain provider, then check again. DNS changes usually apply within minutes but can
-              take up to an hour.
-            </p>
+            {instructions.length === 0 ? (
+              // No records means we never got them from our host — say so.
+              // The old copy promised a table that wasn't there.
+              <p className="mt-2 max-w-xl text-sm text-neutral-600">
+                {instructionsError
+                  ? `We couldn't load your DNS records just now. ${instructionsError}`
+                  : 'We’re fetching the DNS records for this domain — press Check again in a moment.'}
+              </p>
+            ) : (
+              <p className="mt-2 max-w-xl text-sm text-neutral-600">
+                Create {instructions.length === 1 ? 'this DNS record' : 'these DNS records'} with your
+                domain provider, then check again. DNS changes usually apply within minutes but can
+                take up to an hour.
+              </p>
+            )}
             {instructions.length > 0 && (
               <table className="mt-3 w-full max-w-xl text-left text-sm">
                 <thead className="text-xs uppercase tracking-wide text-neutral-400">

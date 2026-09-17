@@ -14,16 +14,24 @@ import {
   removeDomainFromVercel,
   VercelDomainError,
 } from '@/lib/domains/vercel'
+import { reportDomainFailure } from '@/lib/domains/messages'
 
 /**
  * Custom domain management — a Pro feature.
  *
  * One domain per centre (the table allows more; the UI deliberately
- * doesn't). Lifecycle: pending (row written, Vercel attach in flight)
+ * doesn't). Lifecycle: pending (row written, Vercel attach unconfirmed)
  * → verifying (attached, waiting on the customer's DNS) → active
  * (Vercel confirms, brand cache busted, traffic serves). The status
  * check is customer-driven — a "Check again" button beats a cron for
  * a thing the customer is actively watching.
+ *
+ * Pending is the state to be careful with: once a row exists the UI
+ * shows the domain, not the add form, so every escape from a pending
+ * row has to run through Check or Remove. Both treat it as "never
+ * attached" — Check retries the attach, Remove skips Vercel entirely —
+ * or a customer whose attach failed is stuck with a row they can
+ * neither advance nor delete.
  */
 
 const HOSTNAME_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/
@@ -31,20 +39,6 @@ const HOSTNAME_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{
 const RESERVED_SUFFIXES = ['growthable.io', 'xovera.io', 'vercel.app']
 
 export type DomainActionState = { error?: string; ok?: string }
-
-/**
- * Vercel's own wording is right for things the customer can act on (a
- * hostname another account already claimed). Credential failures are
- * ours — telling someone staring at their DNS panel "Not authorized"
- * sends them hunting for a problem that isn't theirs.
- */
-function domainErrorMessage(err: unknown, verb: 'attach' | 'check' | 'detach'): string {
-  if (err instanceof VercelDomainError && err.isCredentialProblem) {
-    return 'Custom domains are not set up correctly on this environment — our hosting credentials were rejected. Nothing to fix on your side; please contact support.'
-  }
-  const detail = err instanceof VercelDomainError ? err.message : String(err)
-  return `Could not ${verb} the domain: ${detail}`
-}
 
 async function requireProCenter(): Promise<{ centerId: string } | { error: string }> {
   const center = await getOwnedCenter()
@@ -114,7 +108,7 @@ export async function addCustomDomain(
         await db.from('custom_domains').delete().eq('hostname', hostname)
       }
     }
-    return { error: domainErrorMessage(err, 'attach') }
+    return { error: reportDomainFailure(err, 'attach', hostname) }
   }
 
   await db.from('custom_domains').update({ status: 'verifying' }).eq('hostname', hostname)
@@ -139,11 +133,27 @@ export async function checkCustomDomain(): Promise<DomainActionState> {
     .maybeSingle()
   if (!row) return { error: 'No domain to check.' }
 
+  // Pending means the attach never came back clean, and the status read
+  // below would only 404 forever. Retry it — attaching is idempotent
+  // when the hostname is already on this project, so this is the same
+  // button doing the obvious thing rather than a second one nobody
+  // would know to press.
+  if (row.status === 'pending') {
+    try {
+      await addDomainToVercel(row.hostname)
+      await db.from('custom_domains').update({ status: 'verifying' }).eq('hostname', row.hostname)
+      row.status = 'verifying'
+    } catch (err) {
+      revalidatePath('/dashboard/domain')
+      return { error: reportDomainFailure(err, 'attach', row.hostname) }
+    }
+  }
+
   let status
   try {
     status = await getDomainStatus(row.hostname)
   } catch (err) {
-    return { error: domainErrorMessage(err, 'check') }
+    return { error: reportDomainFailure(err, 'check', row.hostname) }
   }
 
   if (status.verified && !status.misconfigured) {
@@ -172,16 +182,21 @@ export async function removeCustomDomain(): Promise<DomainActionState> {
   const db = serviceClient()
   const { data: row } = await db
     .from('custom_domains')
-    .select('hostname')
+    .select('hostname, status')
     .eq('help_center_id', gate.centerId)
     .maybeSingle()
   if (!row) return { error: 'No domain to remove.' }
 
-  if (isVercelDomainsConfigured()) {
+  // A pending row was never confirmed onto the project, so there is
+  // nothing to detach and no risk of orphaning a live hostname. Going
+  // to Vercel anyway is what made a failed attach unremovable: the
+  // detach hit the same broken credentials, so the row that should not
+  // have existed could not be deleted either.
+  if (row.status !== 'pending' && isVercelDomainsConfigured()) {
     try {
       await removeDomainFromVercel(row.hostname)
     } catch (err) {
-      return { error: domainErrorMessage(err, 'detach') }
+      return { error: reportDomainFailure(err, 'detach', row.hostname) }
     }
   }
 

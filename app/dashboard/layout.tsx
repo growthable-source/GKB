@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { currentActor } from '@/lib/authz/authorize'
+import { getOwnedCenter } from '@/lib/dashboard/owned-center'
+import { trialBannerForCenter } from '@/lib/agency-plan/banner'
 
 const NAV = [
   { href: '/dashboard', label: 'Overview' },
@@ -12,6 +14,7 @@ const NAV = [
   // centres get the pitch — better funnel than a dead "coming soon" span.
   { href: '/dashboard/domain', label: 'Domain' },
   { href: '/dashboard/team', label: 'Team' },
+  { href: '/dashboard/billing', label: 'Billing' },
 ]
 
 /**
@@ -33,6 +36,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (isStaff) redirect('/admin/articles')
     redirect('/get/details')
   }
+
+  // The one thing a customer must never be able to miss: they are on a
+  // trial, and exactly when it converts into a charge. Layout-level so it is
+  // on every dashboard page, not just the ones that mention billing.
+  // getOwnedCenter() is request-cached, so the page's own call is free.
+  const center = await getOwnedCenter()
+  const trial = center ? await trialBannerForCenter(center.id) : null
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -64,6 +74,34 @@ export default async function DashboardLayout({ children }: { children: React.Re
           )}
         </nav>
       </header>
+      {trial && trial.tone === 'countdown' && (
+        <div className="border-b border-amber-200 bg-amber-50">
+          <p className="mx-auto max-w-5xl px-6 py-3 text-sm text-amber-900">
+            <span className="font-semibold">
+              Free trial — {trial.daysLeft} {trial.daysLeft === 1 ? 'day' : 'days'} left.
+            </span>{' '}
+            {trial.priceLabel
+              ? `First charge of ${trial.priceLabel} on ${trial.chargeDate}.`
+              : `Your first charge lands on ${trial.chargeDate}.`}{' '}
+            <Link href="/dashboard/billing" className="font-medium underline">
+              Cancel anytime before then — you won&apos;t be charged
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+      {trial && trial.tone === 'canceled' && (
+        <div className="border-b border-neutral-200 bg-neutral-100">
+          <p className="mx-auto max-w-5xl px-6 py-3 text-sm text-neutral-700">
+            <span className="font-semibold">Trial cancelled — you won&apos;t be charged.</span>{' '}
+            Everything works until {trial.chargeDate}.{' '}
+            <Link href="/dashboard/billing" className="font-medium underline">
+              Changed your mind? Resume here
+            </Link>
+            .
+          </p>
+        </div>
+      )}
       <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
     </div>
   )
