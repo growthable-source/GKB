@@ -292,6 +292,7 @@ export type Database = {
           help_center_id: string
           hostname: string
           id: string
+          ownership_token: string | null
           status: string
           verified_at: string | null
         }
@@ -300,6 +301,7 @@ export type Database = {
           help_center_id: string
           hostname: string
           id?: string
+          ownership_token?: string | null
           status?: string
           verified_at?: string | null
         }
@@ -308,6 +310,7 @@ export type Database = {
           help_center_id?: string
           hostname?: string
           id?: string
+          ownership_token?: string | null
           status?: string
           verified_at?: string | null
         }

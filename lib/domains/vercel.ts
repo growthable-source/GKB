@@ -3,8 +3,8 @@
  *
  * A customer's hostname has to exist in two places before it serves
  * traffic: attached to our Vercel project (this file) and active in
- * custom_domains (lib/tenancy/active.ts resolves by it). The flow in
- * app/dashboard/domain/actions.ts writes both.
+ * custom_domains (lib/tenancy/active.ts resolves by it). Actions attach
+ * only after a TXT ownership proof — never on the first Add click.
  *
  * Server-only, same rules as lib/ai-widget/client.ts: the token can
  * attach and detach domains on the whole project, so nothing here may
