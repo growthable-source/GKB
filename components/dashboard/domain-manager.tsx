@@ -7,7 +7,7 @@ import type { DnsInstruction } from '@/lib/domains/vercel'
 type Action = (prev: DomainActionState | null, formData: FormData) => Promise<DomainActionState>
 
 const STATUS_COPY: Record<string, { label: string; tone: string }> = {
-  pending: { label: 'Setting up…', tone: 'bg-neutral-100 text-neutral-600' },
+  pending: { label: 'Waiting for ownership TXT', tone: 'bg-neutral-100 text-neutral-600' },
   verifying: { label: 'Waiting for DNS', tone: 'bg-amber-100 text-amber-800' },
   active: { label: 'Live', tone: 'bg-emerald-100 text-emerald-800' },
   failed: { label: 'Failed', tone: 'bg-red-100 text-red-700' },
@@ -106,9 +106,9 @@ export function DomainManager({
               </p>
             ) : (
               <p className="mt-2 max-w-xl text-sm text-neutral-600">
-                Create {instructions.length === 1 ? 'this DNS record' : 'these DNS records'} with your
-                domain provider, then check again. DNS changes usually apply within minutes but can
-                take up to an hour.
+                {domain.status === 'pending'
+                  ? 'Create this TXT record to prove you control the domain. We will not attach the hostname or take it live until that record is visible.'
+                  : `Create ${instructions.length === 1 ? 'this DNS record' : 'these DNS records'} with your domain provider, then check again. DNS changes usually apply within minutes but can take up to an hour.`}
               </p>
             )}
             {instructions.length > 0 && (

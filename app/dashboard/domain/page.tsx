@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { serviceClient } from '@/lib/db/client'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { getDomainStatus, isVercelDomainsConfigured, type DnsInstruction } from '@/lib/domains/vercel'
+import { ownershipInstruction } from '@/lib/domains/ownership'
 import { reportDomainFailure } from '@/lib/domains/messages'
 import { DomainManager } from '@/components/dashboard/domain-manager'
 import { addCustomDomain, checkCustomDomain, removeCustomDomain } from './actions'
@@ -11,9 +12,8 @@ export const dynamic = 'force-dynamic'
 
 /**
  * Custom domain (Pro). Free centres see the pitch; Pro centres add a
- * hostname, get the exact DNS records to create, and check status
- * until it flips live. The DNS instructions come from Vercel at render
- * time so they are always the truth, not a copy of it.
+ * hostname, prove ownership with a TXT record, then get the routing
+ * DNS records from Vercel and check until it flips live.
  */
 export default async function DomainPage() {
   const center = await getOwnedCenter()
@@ -35,20 +35,22 @@ export default async function DomainPage() {
 
   const { data: row } = await serviceClient()
     .from('custom_domains')
-    .select('hostname, status, verified_at')
+    .select('hostname, status, verified_at, ownership_token')
     .eq('help_center_id', center.id)
     .maybeSingle()
 
-  // Live DNS truth for a not-yet-active domain, best-effort — a Vercel
-  // blip should degrade to an explanation, not error the page. What it
-  // must never do is fall through silently: that rendered "create these
-  // DNS records" above an empty table, which sent customers looking for
-  // records that were never going to appear.
+  // Pending: only the ownership TXT we issued — the hostname is not on
+  // Vercel yet. Verifying: that TXT plus Vercel's routing records.
+  // A Vercel blip must not render "create these records" above an empty
+  // table.
   let instructions: DnsInstruction[] = []
   let instructionsError: string | null = null
-  if (row && row.status !== 'active' && isVercelDomainsConfigured()) {
+  if (row && row.status !== 'active' && row.ownership_token) {
+    instructions.push(ownershipInstruction(row.hostname, row.ownership_token))
+  }
+  if (row && row.status === 'verifying' && isVercelDomainsConfigured()) {
     try {
-      instructions = (await getDomainStatus(row.hostname)).instructions
+      instructions = [...instructions, ...(await getDomainStatus(row.hostname)).instructions]
     } catch (err) {
       instructionsError = reportDomainFailure(err, 'check', row.hostname)
     }

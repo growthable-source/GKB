@@ -12,6 +12,7 @@ import { DEFAULT_PRIMARY_HEX, DEFAULT_SECONDARY_HEX } from '@/lib/tenancy/color'
 import { isXoveraConfigured, cancelInstall, setPartnerPlan, XoveraError } from '@/lib/ai-widget/client'
 import { externalIdFor } from '@/lib/ai-widget/external-id'
 import { isVercelDomainsConfigured, removeDomainFromVercel, VercelDomainError } from '@/lib/domains/vercel'
+import { shouldDetachHostname } from '@/lib/domains/lifecycle'
 
 export type CreateHelpCenterState = { error?: string }
 export type EditHelpCenterState = { error?: string; saved?: boolean }
@@ -218,7 +219,10 @@ export async function deleteHelpCenter(
     .from('custom_domains')
     .select('hostname, status')
     .eq('help_center_id', center.id)
-  const domains = (allDomains ?? []).filter((d) => d.status !== 'pending')
+  const domains = []
+  for (const d of allDomains ?? []) {
+    if (await shouldDetachHostname(d.hostname, center.id, d.status)) domains.push(d)
+  }
   if (isVercelDomainsConfigured()) {
     for (const d of domains) {
       try {

@@ -12,26 +12,22 @@ import {
   getDomainStatus,
   isVercelDomainsConfigured,
   removeDomainFromVercel,
-  VercelDomainError,
 } from '@/lib/domains/vercel'
 import { reportDomainFailure } from '@/lib/domains/messages'
+import {
+  hostnameHasOwnershipTxt,
+  newOwnershipToken,
+} from '@/lib/domains/ownership'
+import { liveHostnameOwner, shouldDetachHostname } from '@/lib/domains/lifecycle'
 
 /**
  * Custom domain management — a Pro feature.
  *
- * One domain per centre (the table allows more; the UI deliberately
- * doesn't). Lifecycle: pending (row written, Vercel attach unconfirmed)
- * → verifying (attached, waiting on the customer's DNS) → active
- * (Vercel confirms, brand cache busted, traffic serves). The status
- * check is customer-driven — a "Check again" button beats a cron for
- * a thing the customer is actively watching.
- *
- * Pending is the state to be careful with: once a row exists the UI
- * shows the domain, not the add form, so every escape from a pending
- * row has to run through Check or Remove. Both treat it as "never
- * attached" — Check retries the attach, Remove skips Vercel entirely —
- * or a customer whose attach failed is stuck with a row they can
- * neither advance nor delete.
+ * One domain per centre. Lifecycle: pending (ownership TXT issued, not
+ * attached) → verifying (TXT proven, attached, waiting on routing DNS)
+ * → active (Vercel confirms routing, brand cache busted, traffic serves).
+ * Pending rows do not lock the hostname for other centres and are not
+ * attached to the shared Vercel project.
  */
 
 const HOSTNAME_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/
@@ -39,6 +35,13 @@ const HOSTNAME_RE = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{
 const RESERVED_SUFFIXES = ['growthable.io', 'xovera.io', 'vercel.app']
 
 export type DomainActionState = { error?: string; ok?: string }
+
+type DomainRow = {
+  id: string
+  hostname: string
+  status: string
+  ownership_token: string | null
+}
 
 async function requireProCenter(): Promise<{ centerId: string } | { error: string }> {
   const center = await getOwnedCenter()
@@ -74,50 +77,37 @@ export async function addCustomDomain(
   }
 
   const db = serviceClient()
-
-  const { data: existing } = await db
-    .from('custom_domains')
-    .select('help_center_id, status')
-    .eq('hostname', hostname)
-    .maybeSingle()
-  if (existing && existing.help_center_id !== gate.centerId) {
+  const live = await liveHostnameOwner(hostname)
+  if (live && live !== gate.centerId) {
     return { error: 'That hostname is already in use by another help centre.' }
   }
 
-  // Row first, so a Vercel timeout leaves a visible pending row to
-  // retry from rather than an attach nobody remembers.
+  const { data: mine } = await db
+    .from('custom_domains')
+    .select('id, hostname, status, ownership_token')
+    .eq('help_center_id', gate.centerId)
+    .maybeSingle<DomainRow>()
+  if (mine?.status === 'active') {
+    return { error: 'Remove the current domain before adding a new one.' }
+  }
+
+  const token = newOwnershipToken()
   const { error: upsertError } = await db.from('custom_domains').upsert(
-    { help_center_id: gate.centerId, hostname, status: 'pending' },
-    { onConflict: 'hostname' },
+    {
+      help_center_id: gate.centerId,
+      hostname,
+      status: 'pending',
+      ownership_token: token,
+      verified_at: null,
+    },
+    { onConflict: 'help_center_id' },
   )
   if (upsertError) return { error: `Could not save the domain: ${upsertError.message}` }
 
-  try {
-    await addDomainToVercel(hostname)
-  } catch (err) {
-    // A definitive HTTP rejection means the attach did NOT happen, so the
-    // pending row above is a lie — and worse, it holds the hostname
-    // against every other centre (see the conflict check). Undo it,
-    // restoring any state this row had before. A transport failure
-    // (status null) leaves the outcome genuinely unknown, so that row
-    // stays put to be retried, which is what it's there for.
-    if (err instanceof VercelDomainError && err.status !== null) {
-      if (existing) {
-        await db.from('custom_domains').update({ status: existing.status }).eq('hostname', hostname)
-      } else {
-        await db.from('custom_domains').delete().eq('hostname', hostname)
-      }
-    }
-    return { error: reportDomainFailure(err, 'attach', hostname) }
-  }
-
-  await db.from('custom_domains').update({ status: 'verifying' }).eq('hostname', hostname)
   revalidatePath('/dashboard/domain')
-  return { ok: 'Domain added — now point your DNS at us using the records below.' }
+  return { ok: 'Domain saved — add the TXT record below to prove you control it, then check again.' }
 }
 
-// Fewer params than useActionState passes — fine, TS/JS both allow it,
-// and it spares the unused-vars dance.
 export async function checkCustomDomain(): Promise<DomainActionState> {
   const gate = await requireProCenter()
   if ('error' in gate) return { error: gate.error }
@@ -128,25 +118,40 @@ export async function checkCustomDomain(): Promise<DomainActionState> {
   const db = serviceClient()
   const { data: row } = await db
     .from('custom_domains')
-    .select('hostname, status')
+    .select('id, hostname, status, ownership_token')
     .eq('help_center_id', gate.centerId)
-    .maybeSingle()
+    .maybeSingle<DomainRow>()
   if (!row) return { error: 'No domain to check.' }
 
-  // Pending means the attach never came back clean, and the status read
-  // below would only 404 forever. Retry it — attaching is idempotent
-  // when the hostname is already on this project, so this is the same
-  // button doing the obvious thing rather than a second one nobody
-  // would know to press.
+  const live = await liveHostnameOwner(row.hostname)
+  if (live && live !== gate.centerId) {
+    await db.from('custom_domains').update({ status: 'failed' }).eq('id', row.id)
+    revalidatePath('/dashboard/domain')
+    return { error: 'That hostname is already in use by another help centre.' }
+  }
+
+  let token = row.ownership_token
+  if (!token) {
+    token = newOwnershipToken()
+    await db.from('custom_domains').update({ ownership_token: token, status: 'pending' }).eq('id', row.id)
+    revalidatePath('/dashboard/domain')
+    return { ok: 'Add the TXT record below to prove you control this domain, then check again.' }
+  }
+
+  const owns = await hostnameHasOwnershipTxt(row.hostname, token)
+  if (!owns) {
+    revalidatePath('/dashboard/domain')
+    return { ok: 'We cannot see the ownership TXT record yet. Create it, wait a minute, and check again.' }
+  }
+
   if (row.status === 'pending') {
     try {
       await addDomainToVercel(row.hostname)
-      await db.from('custom_domains').update({ status: 'verifying' }).eq('hostname', row.hostname)
-      row.status = 'verifying'
     } catch (err) {
-      revalidatePath('/dashboard/domain')
       return { error: reportDomainFailure(err, 'attach', row.hostname) }
     }
+    await db.from('custom_domains').update({ status: 'verifying' }).eq('id', row.id)
+    row.status = 'verifying'
   }
 
   let status
@@ -157,22 +162,30 @@ export async function checkCustomDomain(): Promise<DomainActionState> {
   }
 
   if (status.verified && !status.misconfigured) {
-    await db
+    const { error: activateError } = await db
       .from('custom_domains')
       .update({ status: 'active', verified_at: new Date().toISOString() })
+      .eq('id', row.id)
+    if (activateError) {
+      await db.from('custom_domains').update({ status: 'failed' }).eq('id', row.id)
+      revalidatePath('/dashboard/domain')
+      return { error: 'That hostname is already in use by another help centre.' }
+    }
+    await db
+      .from('custom_domains')
+      .update({ status: 'failed' })
       .eq('hostname', row.hostname)
-    // Hostname → centre resolution is cached; without this the new
-    // domain 404s until the brand TTL rolls over.
+      .neq('id', row.id)
     updateTag(BRAND_TAG)
     revalidatePath('/dashboard/domain')
     return { ok: 'Your domain is live. 🎉' }
   }
 
   if (row.status !== 'verifying') {
-    await db.from('custom_domains').update({ status: 'verifying' }).eq('hostname', row.hostname)
+    await db.from('custom_domains').update({ status: 'verifying' }).eq('id', row.id)
   }
   revalidatePath('/dashboard/domain')
-  return { ok: 'Not verified yet — DNS changes can take a few minutes to propagate. Check the records below and try again.' }
+  return { ok: 'Ownership is proven — now point the hostname at us using the records below, then check again.' }
 }
 
 export async function removeCustomDomain(): Promise<DomainActionState> {
@@ -182,17 +195,12 @@ export async function removeCustomDomain(): Promise<DomainActionState> {
   const db = serviceClient()
   const { data: row } = await db
     .from('custom_domains')
-    .select('hostname, status')
+    .select('id, hostname, status, ownership_token')
     .eq('help_center_id', gate.centerId)
-    .maybeSingle()
+    .maybeSingle<DomainRow>()
   if (!row) return { error: 'No domain to remove.' }
 
-  // A pending row was never confirmed onto the project, so there is
-  // nothing to detach and no risk of orphaning a live hostname. Going
-  // to Vercel anyway is what made a failed attach unremovable: the
-  // detach hit the same broken credentials, so the row that should not
-  // have existed could not be deleted either.
-  if (row.status !== 'pending' && isVercelDomainsConfigured()) {
+  if (isVercelDomainsConfigured() && (await shouldDetachHostname(row.hostname, gate.centerId, row.status))) {
     try {
       await removeDomainFromVercel(row.hostname)
     } catch (err) {
@@ -200,7 +208,7 @@ export async function removeCustomDomain(): Promise<DomainActionState> {
     }
   }
 
-  await db.from('custom_domains').delete().eq('hostname', row.hostname)
+  await db.from('custom_domains').delete().eq('id', row.id)
   updateTag(BRAND_TAG)
   revalidatePath('/dashboard/domain')
   return { ok: 'Domain removed — your help centre is back on its Growthable address.' }
