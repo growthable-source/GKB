@@ -41,6 +41,9 @@ export default async function CollectionPage({
     ...allArticles.filter((article) => !excluded.has(article.id)),
     ...ownedArticles,
   ]
+  // A shared section this centre hid in full is gone from its home page, so its
+  // URL should not still render an empty shell.
+  if (articles.length === 0 && allArticles.length > 0) notFound()
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-12">
