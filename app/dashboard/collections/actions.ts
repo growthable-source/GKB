@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath, updateTag } from 'next/cache'
+import { after } from 'next/server'
 import { CONTENT_ARTICLES_TAG, CONTENT_COLLECTIONS_TAG, EXCLUSIONS_TAG } from '@/lib/cache/tags'
 import { serviceClient } from '@/lib/db/client'
 import { authorize } from '@/lib/authz/authorize'
@@ -149,23 +150,38 @@ export async function setSharedSectionHidden(
   const articleIds = articleIdsInSection(index, collectionId)
   const db = serviceClient()
 
-  for (let i = 0; i < articleIds.length; i += EXCLUSION_CHUNK) {
-    const chunk = articleIds.slice(i, i + EXCLUSION_CHUNK)
-    const { error } = hidden
-      ? await db.from('help_center_article_exclusions').upsert(
-          chunk.map((articleId) => ({ help_center_id: center.id, article_id: articleId })),
-          { onConflict: 'help_center_id,article_id', ignoreDuplicates: true },
-        )
-      : await db
+  if (hidden && articleIds.length > 0) {
+    // One request: the rows travel in the POST body, so size is not a URL
+    // problem, and a section is at most a few hundred rows.
+    const { error } = await db.from('help_center_article_exclusions').upsert(
+      articleIds.map((articleId) => ({ help_center_id: center.id, article_id: articleId })),
+      { onConflict: 'help_center_id,article_id', ignoreDuplicates: true },
+    )
+    if (error) throw new Error(`Could not hide that section: ${error.message}`)
+  } else if (!hidden) {
+    // Deletes filter in the URL, so they are chunked, and run side by side.
+    const chunks: string[][] = []
+    for (let i = 0; i < articleIds.length; i += EXCLUSION_CHUNK) {
+      chunks.push(articleIds.slice(i, i + EXCLUSION_CHUNK))
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        db
           .from('help_center_article_exclusions')
           .delete()
           .eq('help_center_id', center.id)
-          .in('article_id', chunk)
-    if (error) throw new Error(`Could not change that section's visibility: ${error.message}`)
+          .in('article_id', chunk),
+      ),
+    )
+    const failed = results.find((result) => result.error)
+    if (failed?.error) throw new Error(`Could not show that section: ${failed.error.message}`)
   }
 
   updateTag(EXCLUSIONS_TAG)
-  await pushKnowledgeRefresh(center.id)
+  // The widget re-crawl is a call to Xovera the owner should not wait on.
+  // after() runs it once the response is sent and keeps the function alive
+  // until it finishes, which is what awaiting it was protecting.
+  after(() => pushKnowledgeRefresh(center.id))
   revalidatePath('/dashboard/collections')
   revalidatePath('/dashboard/articles')
 }

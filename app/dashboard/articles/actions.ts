@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath, updateTag } from 'next/cache'
+import { after } from 'next/server'
 import { redirect } from 'next/navigation'
 import { CONTENT_ARTICLES_TAG, CONTENT_COLLECTIONS_TAG, EXCLUSIONS_TAG } from '@/lib/cache/tags'
 import { serviceClient } from '@/lib/db/client'
@@ -185,7 +186,8 @@ export async function setSharedArticleHidden(
 
   updateTag(EXCLUSIONS_TAG)
   // Showing/hiding a shared article changes what the public centre — and
-  // therefore the crawl — sees.
-  await pushKnowledgeRefresh(center.id)
+  // therefore the crawl — sees. Run after the response so the button flips
+  // without waiting on Xovera; after() keeps the function alive for it.
+  after(() => pushKnowledgeRefresh(center.id))
   revalidatePath('/dashboard/articles')
 }

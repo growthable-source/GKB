@@ -43,6 +43,30 @@ export const getExcludedArticleIds = cache(
     new Set(await cachedExclusions(helpCenterId)),
 )
 
+/**
+ * The same set read straight from the database, for the owner's dashboard.
+ *
+ * Public pages can live with the data cache: a visitor never sees the write.
+ * The owner does, immediately, on the page they just clicked. Expiring a tag
+ * on Vercel's shared data cache is not guaranteed to land before the action's
+ * re-render reads it again, so a cached read here sometimes showed the old
+ * button state until a manual refresh.
+ */
+export const getExcludedArticleIdsFresh = cache(
+  async (helpCenterId: string): Promise<Set<string>> => {
+    const rows = await selectAll<{ article_id: string }>(
+      () =>
+        serviceClient()
+          .from('help_center_article_exclusions')
+          .select('article_id')
+          .eq('help_center_id', helpCenterId)
+          .order('article_id'),
+      'help center exclusions (fresh)',
+    )
+    return new Set(rows.map((row) => row.article_id))
+  },
+)
+
 /** The centers that currently exclude a given article, for the editor. */
 export async function getExcludingCenterIds(articleId: string): Promise<string[]> {
   const { data, error } = await serviceClient()
