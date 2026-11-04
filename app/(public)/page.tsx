@@ -30,11 +30,13 @@ export default async function HomePage() {
     getExcludedArticleIds(helpCenter.id),
   ])
 
-  // Shared collections keep their curated order; the centre's own follow.
-  const collections = [...shared, ...owned]
   // Exclusions apply to the shared half only — a centre cannot hide its own
   // article, it unpublishes or deletes it.
   const counts = countArticlesPerCollection([...index, ...ownedIndex], excluded)
+  // Shared collections keep their curated order; the centre's own follow. A
+  // shared section with nothing left to show (the centre hid all of it) gets
+  // no tile, rather than an empty "0 articles" one.
+  const collections = [...shared.filter((c) => (counts[c.id] ?? 0) > 0), ...owned]
 
   return (
     <>
