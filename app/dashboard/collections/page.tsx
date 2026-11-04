@@ -3,9 +3,10 @@ import { redirect } from 'next/navigation'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { listOwnerCollections } from '@/lib/dashboard/owned-content'
 import { getBaseHelpCenterId } from '@/lib/tenancy/active'
-import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
+import { getExcludedArticleIdsFresh } from '@/lib/tenancy/exclusions'
 import { getCachedArticleCollectionIndex, getCachedCollections } from '@/lib/content/cached'
 import { summariseSharedSections } from '@/lib/dashboard/shared-sections'
+import { PendingButton } from '@/components/dashboard/pending-button'
 import { createOwnerCollection, deleteOwnerCollection, setSharedSectionHidden } from './actions'
 import { NewCollectionForm } from '@/components/dashboard/new-collection-form'
 
@@ -20,7 +21,7 @@ export default async function OwnerCollectionsPage() {
     listOwnerCollections(center.id),
     getCachedCollections(baseId),
     getCachedArticleCollectionIndex(baseId),
-    getExcludedArticleIds(center.id),
+    getExcludedArticleIdsFresh(center.id),
   ])
   const shared = summariseSharedSections(sharedCollections, index, excluded)
 
@@ -119,9 +120,9 @@ export default async function OwnerCollectionsPage() {
                       await setSharedSectionHidden(section.id, !allHidden)
                     }}
                   >
-                    <button
-                      type="submit"
-                      className={`cursor-pointer whitespace-nowrap rounded-md border px-3 py-1.5 text-xs ${
+                    <PendingButton
+                      pendingLabel={allHidden ? 'Showing…' : 'Hiding…'}
+                      className={`whitespace-nowrap rounded-md border px-3 py-1.5 text-xs ${
                         allHidden
                           ? 'border-neutral-300 text-neutral-600'
                           : 'border-neutral-900 text-neutral-900'
@@ -132,7 +133,7 @@ export default async function OwnerCollectionsPage() {
                         : section.hidden > 0
                           ? 'Hide the rest'
                           : 'Hide section'}
-                    </button>
+                    </PendingButton>
                   </form>
                 </li>
               )

@@ -2,11 +2,12 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { serviceClient } from '@/lib/db/client'
 import { getBaseHelpCenterId } from '@/lib/tenancy/active'
-import { getExcludedArticleIds } from '@/lib/tenancy/exclusions'
+import { getExcludedArticleIdsFresh } from '@/lib/tenancy/exclusions'
 import { getOwnedCenter } from '@/lib/dashboard/owned-center'
 import { listOwnerArticles, listOwnerCollections } from '@/lib/dashboard/owned-content'
 import { getCachedArticlesInCollection, getCachedCollections } from '@/lib/content/cached'
 import { setSharedSectionHidden } from '../collections/actions'
+import { PendingButton } from '@/components/dashboard/pending-button'
 import { createOwnerArticle, setSharedArticleHidden } from './actions'
 
 export const metadata = { title: 'Articles — Growthable' }
@@ -112,7 +113,7 @@ export default async function DashboardArticlesPage({
   const [own, collections, excluded, shared] = await Promise.all([
     listOwnerArticles(center.id),
     listOwnerCollections(center.id),
-    getExcludedArticleIds(center.id),
+    getExcludedArticleIdsFresh(center.id),
     sharedPage,
   ])
 
@@ -238,11 +239,14 @@ export default async function DashboardArticlesPage({
               await setSharedSectionHidden(section.id, !sectionAllHidden)
             }}
           >
-            <button type="submit" className="cursor-pointer text-sm underline">
+            <PendingButton
+              pendingLabel={sectionAllHidden ? 'Showing…' : 'Hiding…'}
+              className="text-sm underline"
+            >
               {sectionAllHidden
                 ? `Show every article in ${section.title}`
                 : `Hide every article in ${section.title}`}
-            </button>
+            </PendingButton>
           </form>
         )}
 
@@ -275,16 +279,16 @@ export default async function DashboardArticlesPage({
                     await setSharedArticleHidden(article.id, !hidden)
                   }}
                 >
-                  <button
-                    type="submit"
-                    className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs ${
+                  <PendingButton
+                    pendingLabel={hidden ? 'Showing…' : 'Hiding…'}
+                    className={`whitespace-nowrap rounded-md border px-3 py-1.5 text-xs ${
                       hidden
                         ? 'border-neutral-300 text-neutral-600'
                         : 'border-neutral-900 text-neutral-900'
                     }`}
                   >
                     {hidden ? 'Hidden — show it' : 'Hide'}
-                  </button>
+                  </PendingButton>
                 </form>
               </li>
             )
